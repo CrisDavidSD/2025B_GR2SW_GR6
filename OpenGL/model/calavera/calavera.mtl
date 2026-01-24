@@ -1,0 +1,13 @@
+# Blender 5.0.1 MTL File: 'None'
+# www.blender.org
+
+newmtl skull_teste
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.014476 0.014476 0.014476
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd skull_teste_baseColor.png
+map_Bump -bm 1.000000 skull_teste_normal.png

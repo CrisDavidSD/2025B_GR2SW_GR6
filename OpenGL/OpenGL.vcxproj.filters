@@ -1,0 +1,54 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Archivos de origen">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Archivos de encabezado">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Archivos de recursos">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Archivos de origen\shaders">
+      <UniqueIdentifier>{78c2348d-6df2-4d46-96c5-6bf4f13a7fba}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Archivos de origen\textures">
+      <UniqueIdentifier>{525aced5-8488-496a-8613-e8a7a30466a7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Archivos de origen\model">
+      <UniqueIdentifier>{2076af27-d4e2-43ff-aaa3-2297a3412e9b}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\..\Escritorio\Sources\glad\src\glad.c">
+      <Filter>Archivos de origen</Filter>
+    </ClCompile>
+    <ClCompile Include="ProyectoFinal.cpp">
+      <Filter>Archivos de origen</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\..\..\Downloads\Proyect\shaders\scene.fs">
+      <Filter>Archivos de origen\shaders</Filter>
+    </None>
+    <None Include="..\..\..\..\..\Downloads\Proyect\shaders\scene.vs">
+      <Filter>Archivos de origen\shaders</Filter>
+    </None>
+    <None Include="..\..\..\..\..\Downloads\Proyect\shaders\skybox.fs">
+      <Filter>Archivos de origen\shaders</Filter>
+    </None>
+    <None Include="..\..\..\..\..\Downloads\Proyect\shaders\skybox.vs">
+      <Filter>Archivos de origen\shaders</Filter>
+    </None>
+    <None Include="shaders\shader_modeloLiz_mloading.fs">
+      <Filter>Archivos de origen\shaders</Filter>
+    </None>
+    <None Include="shaders\shader_modeloLiz_mloading.vs">
+      <Filter>Archivos de origen\shaders</Filter>
+    </None>
+  </ItemGroup>
+</Project>

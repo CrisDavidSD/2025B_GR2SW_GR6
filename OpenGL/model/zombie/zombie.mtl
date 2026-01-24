@@ -1,0 +1,35 @@
+# Blender 5.0.1 MTL File: 'None'
+# www.blender.org
+
+newmtl Body
+Ns 159.999985
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Body_baseColor.png
+map_Bump -bm 1.000000 Body_normal.png
+
+newmtl Bottom
+Ns 159.999985
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Bottom_baseColor.png
+map_Bump -bm 1.000000 Bottom_normal.png
+
+newmtl material
+Ns 159.999985
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd material_baseColor.png
+map_Bump -bm 1.000000 material_normal.png
