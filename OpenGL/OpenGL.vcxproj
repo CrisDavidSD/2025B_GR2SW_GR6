@@ -128,7 +128,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\..\Escritorio\Sources\glad\src\glad.c" />
+    <ClCompile Include="..\OpenGL_Stuff\Library\glad.c" />
     <ClCompile Include="ProyectoFinal.cpp" />
   </ItemGroup>
   <ItemGroup>

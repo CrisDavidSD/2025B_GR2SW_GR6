@@ -79,8 +79,8 @@ int main()
 
 
     // b) Los Objetos a recoger
-    Model item1("model/backpack/backpack.obj");
-    Model item2("model/backpack/backpack.obj");
+    Model item1("model/farola/farola.obj");
+    Model item2("model/farola/farola.obj");
     // Agrega más modelos aquí...
 
     stbi_set_flip_vertically_on_load(false); // Desactivar flip para el skybox
