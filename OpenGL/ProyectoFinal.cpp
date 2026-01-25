@@ -77,7 +77,7 @@ int main()
 
     // a) El Entorno (Suelo/Paredes)
     //Model environment("C:/Texturas/model/Town/Untitled.obj");
-    Model environment("model/Town/Untitled.obj");
+    Model environment("model/Pueblo/Pueblo.obj");
 
 
     // b) Los Objetos a recoger
