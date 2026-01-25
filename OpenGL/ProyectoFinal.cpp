@@ -1,4 +1,4 @@
-#include <glad/glad.h>
+Ôªø#include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
 #include <glm/glm.hpp>
@@ -24,9 +24,11 @@ unsigned int loadCubemap(std::vector<std::string> faces);
 // Configuraciones
 const unsigned int SCR_WIDTH = 1280;
 const unsigned int SCR_HEIGHT = 720;
+const float GROUND_HEIGHT = 0.0f;
+const float EYE_HEIGHT = 0.6f;
 
-// C·mara
-Camera camera(glm::vec3(0.0f, 2.0f, 10.0f)); // Altura inicial 2.0
+// C√°mara
+Camera camera(glm::vec3(0.0f, GROUND_HEIGHT + EYE_HEIGHT, 10.0f));
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
@@ -71,7 +73,7 @@ int main()
     Shader skyboxShader("shaders/skybox.vs", "shaders/skybox.fs");
 
 
-    stbi_set_flip_vertically_on_load(true); // Flip para modelos .obj
+    stbi_set_flip_vertically_on_load(false); // Flip para modelos .obj
 
     // a) El Entorno (Suelo/Paredes)
     //Model environment("C:/Texturas/model/Town/Untitled.obj");
@@ -81,11 +83,11 @@ int main()
     // b) Los Objetos a recoger
     Model item1("model/farola/farola.obj");
     Model item2("model/farola/farola.obj");
-    // Agrega m·s modelos aquÌ...
+    // Agrega m√°s modelos aqu√≠...
 
     stbi_set_flip_vertically_on_load(false); // Desactivar flip para el skybox
 
-    // 4. ConfiguraciÛn del Skybox (Cubo)
+    // 4. Configuraci√≥n del Skybox (Cubo)
     // ----------------------------------
     float skyboxVertices[] = {
         -10.0f,  10.0f, -10.0f, -10.0f, -10.0f, -10.0f,  10.0f, -10.0f, -10.0f,
@@ -144,7 +146,7 @@ int main()
         // ============================================
         sceneShader.use();
 
-        // ConfiguraciÛn de Luces (LINTERNA / SPOTLIGHT)
+        // Configuraci√≥n de Luces (LINTERNA / SPOTLIGHT)
         sceneShader.setVec3("viewPos", camera.Position);
 
         // Propiedades de la linterna (Spotlight)
@@ -159,7 +161,7 @@ int main()
         sceneShader.setFloat("spotLight.cutOff", glm::cos(glm::radians(12.5f)));
         sceneShader.setFloat("spotLight.outerCutOff", glm::cos(glm::radians(17.5f)));
 
-        // Matrices de transformaciÛn
+        // Matrices de transformaci√≥n
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
         glm::mat4 view = camera.GetViewMatrix();
         sceneShader.setMat4("projection", projection);
@@ -167,22 +169,22 @@ int main()
 
         // 1. Dibujar Entorno (Suelo)
         glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0.0f, -1.0f, 0.0f)); // Bajar un poco el suelo
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f)); // Bajar un poco el suelo
         model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));
         sceneShader.setMat4("model", model);
         environment.Draw(sceneShader);
 
         // 2. Dibujar Item 1 (Siempre visible)
         model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(5.0f, 0.0f, -5.0f)); // PosiciÛn Item 1
+        model = glm::translate(model, glm::vec3(5.0f, 0.0f, -5.0f)); // Posici√≥n Item 1
         model = glm::scale(model, glm::vec3(0.005f));
         sceneShader.setMat4("model", model);
         item1.Draw(sceneShader);
 
-        // 3. Dibujar Item 2 (Solo si recogiste el anterior... lÛgica pendiente)
+        // 3. Dibujar Item 2 (Solo si recogiste el anterior... l√≥gica pendiente)
         // Por ahora dibujamos todos para probar
         model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(-5.0f, 0.0f, -8.0f)); // PosiciÛn Item 2
+        model = glm::translate(model, glm::vec3(-5.0f, 0.0f, -8.0f)); // Posici√≥n Item 2
         model = glm::scale(model, glm::vec3(0.1f));
         sceneShader.setMat4("model", model);
         item2.Draw(sceneShader);
@@ -191,7 +193,7 @@ int main()
 
         glDepthFunc(GL_LEQUAL);
         skyboxShader.use();
-        view = glm::mat4(glm::mat3(camera.GetViewMatrix())); // Quitar traslaciÛn
+        view = glm::mat4(glm::mat3(camera.GetViewMatrix())); // Quitar traslaci√≥n
         skyboxShader.setMat4("view", view);
         skyboxShader.setMat4("projection", projection);
 
@@ -210,18 +212,36 @@ int main()
     return 0;
 }
 
-// Inputs y Callbacks (Igual que tenÌas)
-void processInput(GLFWwindow* window) {
+// Inputs y Callbacks (Igual que ten√≠as)
+void processInput(GLFWwindow* window)
+{
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
+
+    glm::vec3 position = camera.Position;
+
+    // Direcci√≥n hacia adelante SIN componente Y
+    glm::vec3 forward = camera.Front;
+    forward.y = 0.0f;
+    forward = glm::normalize(forward);
+
+    glm::vec3 right = glm::normalize(glm::cross(forward, camera.Up));
+
+    float velocity = camera.MovementSpeed * deltaTime;
+
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-        camera.ProcessKeyboard(FORWARD, deltaTime);
+        position += forward * velocity;
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-        camera.ProcessKeyboard(BACKWARD, deltaTime);
+        position -= forward * velocity;
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        camera.ProcessKeyboard(LEFT, deltaTime);
+        position -= right * velocity;
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        camera.ProcessKeyboard(RIGHT, deltaTime);
+        position += right * velocity;
+
+    // Altura fija tipo persona
+    position.y = GROUND_HEIGHT + EYE_HEIGHT;
+
+    camera.Position = position;
 }
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
@@ -245,7 +265,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
     camera.ProcessMouseScroll(yoffset);
 }
 
-// FunciÛn auxiliar para cargar Cubemap
+// Funci√≥n auxiliar para cargar Cubemap
 unsigned int loadCubemap(std::vector<std::string> faces)
 {
     unsigned int textureID;
