@@ -1,0 +1,65 @@
+# Blender 5.0.1 MTL File: 'None'
+# www.blender.org
+
+newmtl Material.001
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd -s 10 10 1 Material.001_baseColor.jpeg
+map_Bump -s 10 10 1 -bm 1.000000 Material.001_normal.jpeg
+
+newmtl Material.002
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd -s 10 10 1 Material.002_baseColor.jpeg
+map_Bump -s 10 10 1 -bm 1.000000 Material.002_normal.jpeg
+
+newmtl glass
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Kd 0.536667 0.722026 0.800063
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+
+newmtl metal
+Ns 67.599998
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd metal_baseColor.png
+
+newmtl metal.001
+Ns 232.148605
+Ka 0.330909 0.330909 0.330909
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 3
+map_Kd metal.001_baseColor.png
+
+newmtl smartconc
+Ns 8.598297
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd smartconc_baseColor.png
+map_Ke smartconc_baseColor.png
+map_Bump -bm 1.000000 smartconc_normal.jpeg
