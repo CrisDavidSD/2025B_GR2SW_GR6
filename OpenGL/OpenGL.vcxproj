@@ -132,10 +132,10 @@
     <ClCompile Include="ProyectoFinal.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\..\..\..\Downloads\Proyect\shaders\scene.fs" />
-    <None Include="..\..\..\..\..\Downloads\Proyect\shaders\scene.vs" />
     <None Include="..\..\..\..\..\Downloads\Proyect\shaders\skybox.fs" />
     <None Include="..\..\..\..\..\Downloads\Proyect\shaders\skybox.vs" />
+    <None Include="shaders\scene.fs" />
+    <None Include="shaders\scene.vs" />
     <None Include="shaders\shader_modeloLiz_mloading.fs" />
     <None Include="shaders\shader_modeloLiz_mloading.vs" />
   </ItemGroup>

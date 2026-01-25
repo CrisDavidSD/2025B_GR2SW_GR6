@@ -126,6 +126,8 @@ int main()
     skyboxShader.use();
     skyboxShader.setInt("skybox", 0);
 
+    glm::vec3 fogColorVector = glm::vec3(0.05f, 0.05f, 0.05f);
+
     // Game Loop
 
     while (!glfwWindowShouldClose(window))
@@ -138,13 +140,15 @@ int main()
         processInput(window);
 
         // Limpiar pantalla (Fondo negro)
-        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClearColor(fogColorVector.x, fogColorVector.y, fogColorVector.z, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // ============================================
         // FASE 1: DIBUJAR ESCENA (CON LINTERNA)
         // ============================================
         sceneShader.use();
+
+        sceneShader.setVec3("fogColor", fogColorVector);
 
         // Configuración de Luces (LINTERNA / SPOTLIGHT)
         sceneShader.setVec3("viewPos", camera.Position);
@@ -153,8 +157,8 @@ int main()
         sceneShader.setVec3("spotLight.position", camera.Position);
         sceneShader.setVec3("spotLight.direction", camera.Front);
         sceneShader.setVec3("spotLight.ambient", 0.5f, 0.5f, 0.5f); // Ambiente bajo (Terror)
-        sceneShader.setVec3("spotLight.diffuse", 1.0f, 1.0f, 1.0f); // Luz blanca
-        sceneShader.setVec3("spotLight.specular", 0.3f, 0.3f, 0.3f);
+        sceneShader.setVec3("spotLight.diffuse", 0.8f, 0.8f, 0.8f); // Luz blanca
+        sceneShader.setVec3("spotLight.specular", 0.6f, 0.6f, 0.6f);
         sceneShader.setFloat("spotLight.constant", 1.0f);
         sceneShader.setFloat("spotLight.linear", 0.09f);
         sceneShader.setFloat("spotLight.quadratic", 0.032f);

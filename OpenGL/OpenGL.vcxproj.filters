@@ -32,12 +32,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\..\..\..\Downloads\Proyect\shaders\scene.fs">
-      <Filter>Archivos de origen\shaders</Filter>
-    </None>
-    <None Include="..\..\..\..\..\Downloads\Proyect\shaders\scene.vs">
-      <Filter>Archivos de origen\shaders</Filter>
-    </None>
     <None Include="..\..\..\..\..\Downloads\Proyect\shaders\skybox.fs">
       <Filter>Archivos de origen\shaders</Filter>
     </None>
@@ -48,6 +42,12 @@
       <Filter>Archivos de origen\shaders</Filter>
     </None>
     <None Include="shaders\shader_modeloLiz_mloading.vs">
+      <Filter>Archivos de origen\shaders</Filter>
+    </None>
+    <None Include="shaders\scene.fs">
+      <Filter>Archivos de origen\shaders</Filter>
+    </None>
+    <None Include="shaders\scene.vs">
       <Filter>Archivos de origen\shaders</Filter>
     </None>
   </ItemGroup>
