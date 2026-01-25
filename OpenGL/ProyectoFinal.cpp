@@ -20,12 +20,15 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow* window);
 unsigned int loadCubemap(std::vector<std::string> faces);
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
 
 // Configuraciones
 const unsigned int SCR_WIDTH = 1280;
 const unsigned int SCR_HEIGHT = 720;
 const float GROUND_HEIGHT = 0.0f;
 const float EYE_HEIGHT = 0.6f;
+bool flashlightOn = true;
+bool leftMousePressed = false;
 
 // Cámara
 Camera camera(glm::vec3(0.0f, GROUND_HEIGHT + EYE_HEIGHT, 10.0f));
@@ -60,6 +63,7 @@ int main()
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetScrollCallback(window, scroll_callback);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetMouseButtonCallback(window, mouse_button_callback);
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
@@ -152,9 +156,19 @@ int main()
         // Propiedades de la linterna (Spotlight)
         sceneShader.setVec3("spotLight.position", camera.Position);
         sceneShader.setVec3("spotLight.direction", camera.Front);
-        sceneShader.setVec3("spotLight.ambient", 0.5f, 0.5f, 0.5f); // Ambiente bajo (Terror)
-        sceneShader.setVec3("spotLight.diffuse", 1.0f, 1.0f, 1.0f); // Luz blanca
-        sceneShader.setVec3("spotLight.specular", 0.3f, 0.3f, 0.3f);
+        if (flashlightOn)
+        {
+            sceneShader.setVec3("spotLight.ambient", 0.5f, 0.5f, 0.5f); // Ambiente bajo (Terror)
+            sceneShader.setVec3("spotLight.diffuse", 1.0f, 1.0f, 1.0f); // Luz blanca
+            sceneShader.setVec3("spotLight.specular", 0.3f, 0.3f, 0.3f);
+        }
+        else
+        {
+            // Linterna apagada = luz 0
+            sceneShader.setVec3("spotLight.ambient", 0.0f, 0.0f, 0.0f);
+            sceneShader.setVec3("spotLight.diffuse", 0.0f, 0.0f, 0.0f);
+            sceneShader.setVec3("spotLight.specular", 0.0f, 0.0f, 0.0f);
+        }
         sceneShader.setFloat("spotLight.constant", 1.0f);
         sceneShader.setFloat("spotLight.linear", 0.09f);
         sceneShader.setFloat("spotLight.quadratic", 0.032f);
@@ -263,6 +277,17 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
     camera.ProcessMouseScroll(yoffset);
+}
+
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
+{
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
+    {
+        flashlightOn = !flashlightOn;
+
+        // Sonido (lo implementamos en la siguiente sección)
+        std::cout << "Flashlight: " << (flashlightOn ? "ON\n" : "OFF\n");
+    }
 }
 
 // Función auxiliar para cargar Cubemap
