@@ -33,6 +33,7 @@ const float GROUND_HEIGHT = 0.0f;
 const float EYE_HEIGHT = 0.6f;
 bool flashlightOn = true;
 bool leftMousePressed = false;
+Mix_Chunk* flashlightSound = nullptr;
 
 // Cámara
 Camera camera(glm::vec3(0.0f, GROUND_HEIGHT + EYE_HEIGHT, 10.0f));
@@ -147,6 +148,13 @@ int main()
         std::cout << "Error SDL_mixer\n";
     }
 
+    // Cargar sonido de linterna
+    flashlightSound = Mix_LoadWAV("audio/flashlight_click.wav");
+    if (!flashlightSound)
+    {
+        std::cout << "Error cargando sonido de linterna\n";
+    }
+
     // Game Loop
 
     while (!glfwWindowShouldClose(window))
@@ -177,9 +185,9 @@ int main()
         sceneShader.setVec3("spotLight.direction", camera.Front);
         if (flashlightOn)
         {
-            sceneShader.setVec3("spotLight.ambient", 0.5f, 0.5f, 0.5f); // Ambiente bajo (Terror)
-            sceneShader.setVec3("spotLight.diffuse", 1.0f, 1.0f, 1.0f); // Luz blanca
-            sceneShader.setVec3("spotLight.specular", 0.3f, 0.3f, 0.3f);
+            sceneShader.setVec3("spotLight.ambient", 0.05f, 0.05f, 0.05f); // Ambiente bajo (Terror)
+            sceneShader.setVec3("spotLight.diffuse", 0.9f, 0.9f, 0.8f); // Luz blanca
+            sceneShader.setVec3("spotLight.specular", 0.2f, 0.2f, 0.2f);
         }
         else
         {
@@ -188,11 +196,12 @@ int main()
             sceneShader.setVec3("spotLight.diffuse", 0.0f, 0.0f, 0.0f);
             sceneShader.setVec3("spotLight.specular", 0.0f, 0.0f, 0.0f);
         }
+
         sceneShader.setFloat("spotLight.constant", 1.0f);
         sceneShader.setFloat("spotLight.linear", 0.09f);
         sceneShader.setFloat("spotLight.quadratic", 0.032f);
-        sceneShader.setFloat("spotLight.cutOff", glm::cos(glm::radians(12.5f)));
-        sceneShader.setFloat("spotLight.outerCutOff", glm::cos(glm::radians(17.5f)));
+        sceneShader.setFloat("spotLight.cutOff", glm::cos(glm::radians(10.0f)));
+        sceneShader.setFloat("spotLight.outerCutOff", glm::cos(glm::radians(15.0f)));
 
         // Matrices de transformación
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
@@ -242,6 +251,12 @@ int main()
     }
 
     glfwTerminate();
+
+    //Limpieza SDL_mixer
+    Mix_FreeChunk(flashlightSound);
+    Mix_CloseAudio();
+    SDL_Quit();
+
     return 0;
 }
 
@@ -304,7 +319,12 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
     {
         flashlightOn = !flashlightOn;
 
-        // Sonido (lo implementamos en la siguiente sección)
+        // Sonido de linterna
+        if (flashlightSound)
+        {
+            Mix_PlayChannel(-1, flashlightSound, 0);
+        }
+
         std::cout << "Flashlight: " << (flashlightOn ? "ON\n" : "OFF\n");
     }
 }
