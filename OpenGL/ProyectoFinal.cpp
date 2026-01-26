@@ -38,6 +38,9 @@ Mix_Chunk* footstepSound = nullptr;
 float stepTimer = 0.0f;
 float stepInterval = 0.60f; // tiempo entre pasos (ajustable)
 bool isMoving = false;
+Mix_Music* ambientMusic = nullptr;
+int ambientBaseVolume = 40;   // volumen base (0–128)
+int ambientCurrentVolume = 40;
 
 // Cámara
 Camera camera(glm::vec3(0.0f, GROUND_HEIGHT + EYE_HEIGHT, 10.0f));
@@ -166,6 +169,18 @@ int main()
         std::cout << "Error cargando sonido de pasos\n";
     }
 
+    // Cargar música de ambiente
+    ambientMusic = Mix_LoadMUS("audio/ambient.wav");
+    if (!ambientMusic)
+    {
+        std::cout << "Error cargando sonido ambiente\n";
+    }
+    else
+    {
+        Mix_VolumeMusic(ambientBaseVolume);
+        Mix_PlayMusic(ambientMusic, -1); // loop infinito
+    }
+
     // Game Loop
 
     while (!glfwWindowShouldClose(window))
@@ -193,7 +208,30 @@ int main()
             stepTimer = stepInterval; // evita retraso al volver a moverse
         }
 
-        // Limpiar pantalla (Fondo negro)
+        // SONIDO AMBIENTE DINÁMICO
+        int targetVolume = ambientBaseVolume;
+
+        // Si se mueve → baja el ambiente (los pasos dominan)
+        if (isMoving)
+        {
+            targetVolume -= 10;
+        }
+
+        // Si la linterna está apagada → más tensión
+        if (!flashlightOn)
+        {
+            targetVolume += 10;
+        }
+
+        // Clamp seguro
+        if (targetVolume < 10) targetVolume = 10;
+        if (targetVolume > 70) targetVolume = 70;
+
+        // Suavizado (muy importante)
+        ambientCurrentVolume += (targetVolume - ambientCurrentVolume) * 0.05f;
+        Mix_VolumeMusic(ambientCurrentVolume);
+
+        // LIMPIAR PANTALLA (Fondo negro)
         glClearColor(fogColorVector.x, fogColorVector.y, fogColorVector.z, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -280,6 +318,7 @@ int main()
     //Limpieza SDL_mixer
     Mix_FreeChunk(flashlightSound);
     Mix_FreeChunk(footstepSound);
+    Mix_FreeMusic(ambientMusic);
     Mix_CloseAudio();
     SDL_Quit();
 
