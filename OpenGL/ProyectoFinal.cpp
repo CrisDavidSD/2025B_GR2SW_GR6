@@ -15,6 +15,10 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <learnopengl/stb_image.h>
 
+#define SDL_MAIN_HANDLED
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_mixer.h>
+
 void framebuffer_size_callback(GLFWwindow * window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
@@ -131,6 +135,17 @@ int main()
     skyboxShader.setInt("skybox", 0);
 
     glm::vec3 fogColorVector = glm::vec3(0.05f, 0.05f, 0.05f);
+
+    //Prueba audio
+    if (SDL_Init(SDL_INIT_AUDIO) < 0)
+    {
+        std::cout << "Error SDL_AUDIO\n";
+    }
+
+    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0)
+    {
+        std::cout << "Error SDL_mixer\n";
+    }
 
     // Game Loop
 
