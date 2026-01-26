@@ -1,0 +1,123 @@
+# Blender 5.0.1 MTL File: 'None'
+# www.blender.org
+
+newmtl Bodies.001_Baked
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Bodies.001_Baked_baseColor.png
+map_Bump -bm 1.000000 Bodies.001_Baked_normal.png
+
+newmtl Bodies.002_Baked
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Bodies.002_Baked_baseColor.png
+map_Bump -bm 1.000000 Bodies.002_Baked_normal.png
+
+newmtl Bodies_Baked
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Bodies_Baked_baseColor.png
+map_Bump -bm 1.000000 Bodies_Baked_normal.png
+
+newmtl Concrete_barriers_Baked.002_Baked
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Concrete_barriers_Baked.002_Baked_baseColor.png
+map_Bump -bm 1.000000 Concrete_barriers_Baked.002_Baked_normal.png
+
+newmtl Concrete_barriers_Baked_Baked
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Concrete_barriers_Baked_Baked_baseColor.png
+map_Bump -bm 1.000000 Concrete_barriers_Baked_Baked_normal.png
+
+newmtl Door_fences_Baked
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Door_fences_Baked_baseColor.png
+map_Bump -bm 1.000000 Door_fences_Baked_normal.png
+
+newmtl Door_tape_Baked
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Door_tape_Baked_baseColor.png
+map_Bump -bm 1.000000 Door_tape_Baked_normal.png
+
+newmtl Gate_Baked
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Gate_Baked_baseColor.png
+map_Bump -bm 1.000000 Gate_Baked_normal.png
+
+newmtl Hospital_Baked
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Hospital_Baked_baseColor.png
+map_Bump -bm 1.000000 Hospital_Baked_normal.png
+
+newmtl Main_doors_Baked
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Main_doors_Baked_baseColor.png
+map_Bump -bm 1.000000 Main_doors_Baked_normal.png
+
+newmtl Sign_Baked
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Sign_Baked_baseColor.png
+map_Bump -bm 1.000000 Sign_Baked_normal.png

@@ -88,7 +88,7 @@ int main()
     //Model ourModel(FileSystem::getPath("resources/objects/backpack/backpack.obj"));
     //Model ourModel("C:/Users/User/OneDrive - Escuela Politécnica Nacional/Documentos/Visual Studio 2022/OpenGL/OpenGL/model/backpack/backpack.obj");
     //Model ourModel("model/helicopter/helicopter.obj");
-    Model ourModel("model/iglesia/iglesia.obj");
+    Model ourModel("model/hospital/hospital.obj");
     
     
     // draw in wireframe
