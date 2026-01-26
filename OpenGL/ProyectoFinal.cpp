@@ -21,9 +21,9 @@
 #include <SDL2/SDL_mixer.h>
 
 // Forzar uso de GPU dedicada en laptops con GPU 
-extern "C" {
-    __declspec(dllexport) DWORD NvOptimusEnablement = 0x00000001;
-}
+//extern "C" {
+//    __declspec(dllexport) DWORD NvOptimusEnablement = 0x00000001;
+//}
 
 void framebuffer_size_callback(GLFWwindow * window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
@@ -99,7 +99,7 @@ int main()
 
     // a) El Entorno (Suelo/Paredes)
     //Model environment("C:/Texturas/model/Town/Untitled.obj");
-    Model environment("model/Pueblo/Pueblo.obj");
+    Model environment("model/Pueblo/Pueblo7.obj");
 
 
     // b) Los Objetos a recoger
