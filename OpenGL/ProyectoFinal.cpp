@@ -48,6 +48,17 @@ Mix_Music* ambientMusic = nullptr;
 int ambientBaseVolume = 40;   // volumen base (0–128)
 int ambientCurrentVolume = 40;
 
+// Screamer
+bool screamerTriggered = false;
+float gameTime = 0.0f;
+Model* screamerModel = nullptr;
+Mix_Chunk* screamerSound = nullptr;
+float screamerTimer = 0.0f;
+const float SCREAMER_DURATION = 2.0f; // Duración del screamer en pantalla
+// Configuración de posición del screamer
+glm::vec3 screamerOffset = glm::vec3(-0.02f, -0.5f, 0.0f); // Sin offset = centrado
+float screamerDistance = 0.5f; // Distancia desde la cámara
+
 // Cámara
 Camera camera(glm::vec3(0.0f, GROUND_HEIGHT + EYE_HEIGHT, 10.0f));
 float lastX = SCR_WIDTH / 2.0f;
@@ -148,6 +159,9 @@ int main()
     Model item2("model/farola/farola.obj");
     // Agrega más modelos aquí...
 
+    // Cargar modelo del screamer
+    screamerModel = new Model("model/bebeTerror/bebeTerror.obj");
+
     stbi_set_flip_vertically_on_load(false); // Desactivar flip para el skybox
 
     // 4. Configuración del Skybox (Cubo)
@@ -228,6 +242,13 @@ int main()
         Mix_PlayMusic(ambientMusic, -1); // loop infinito
     }
 
+    // Cargar sonido del screamer
+    screamerSound = Mix_LoadWAV("audio/scream.wav");
+    if (!screamerSound)
+    {
+        std::cout << "Error cargando sonido de screamer\n";
+    }
+
     // Game Loop
 
     while (!glfwWindowShouldClose(window))
@@ -238,6 +259,37 @@ int main()
         lastFrame = currentFrame;
 
         processInput(window);
+
+        // Actualizar tiempo de juego
+        gameTime += deltaTime;
+
+        // Trigger del screamer a los 7 segundos
+        if (!screamerTriggered && gameTime >= 90.0f)
+        {
+            screamerTriggered = true;
+            screamerTimer = 0.0f;
+
+            // Reproducir sonido de grito
+            if (screamerSound)
+            {
+                Mix_PlayChannel(-1, screamerSound, 0);
+            }
+
+            // Opcional: bajar música ambiente durante el screamer
+            Mix_VolumeMusic(10);
+        }
+
+        // Actualizar timer del screamer activo
+        if (screamerTriggered && screamerTimer < SCREAMER_DURATION)
+        {
+            screamerTimer += deltaTime;
+
+            // Restaurar volumen cuando termine
+            if (screamerTimer >= SCREAMER_DURATION)
+            {
+                Mix_VolumeMusic(ambientBaseVolume);
+            }
+        }
 
         // SONIDO DE PASOS
         if (isMoving && footstepSound)
@@ -341,6 +393,36 @@ int main()
         sceneShader.setMat4("model", model);
         item2.Draw(sceneShader);
 
+        // Dibujar screamer si está activo
+        if (screamerTriggered && screamerTimer < SCREAMER_DURATION && screamerModel)
+        {
+            model = glm::mat4(1.0f);
+
+            // 1. Calcular posición base frente a la cámara
+            glm::vec3 screamerPos = camera.Position + (camera.Front * screamerDistance);
+
+            // 2. Aplicar offset en el espacio de la cámara
+            glm::vec3 cameraRight = glm::normalize(glm::cross(camera.Front, camera.Up));
+            glm::vec3 cameraUp = camera.Up;
+
+            screamerPos += cameraRight * screamerOffset.x;  // Izquierda/Derecha
+            screamerPos += cameraUp * screamerOffset.y;     // Arriba/Abajo
+            screamerPos += camera.Front * screamerOffset.z; // Adelante/Atrás (adicional)
+
+            model = glm::translate(model, screamerPos);
+
+            // Hacer que mire hacia la cámara
+            glm::vec3 direction = glm::normalize(camera.Position - screamerPos);
+            float angle = atan2(direction.x, direction.z);
+            model = glm::rotate(model, angle, glm::vec3(0.0f, 1.0f, 0.0f));
+
+            // Escala (ajusta según tu modelo)
+            model = glm::scale(model, glm::vec3(0.5f));
+
+            sceneShader.setMat4("model", model);
+            screamerModel->Draw(sceneShader);
+        }
+
         // FASE 2: DIBUJAR SKYBOX 
 
         glDepthFunc(GL_LEQUAL);
@@ -363,6 +445,8 @@ int main()
     glfwTerminate();
 
     //Limpieza SDL_mixer
+    if (screamerModel) delete screamerModel;
+    Mix_FreeChunk(screamerSound);
     Mix_FreeChunk(flashlightSound);
     Mix_FreeChunk(footstepSound);
     Mix_FreeMusic(ambientMusic);
@@ -372,7 +456,7 @@ int main()
     return 0;
 }
 
-// Inputs y Callbacks (Igual que tenías)
+// Inputs y Callbacks
 void processInput(GLFWwindow* window)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
@@ -401,8 +485,10 @@ void processInput(GLFWwindow* window)
         nextPos -= right * velocity;
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
         nextPos += right * velocity;
+
     // Mantenemos la altura fija
     nextPos.y = GROUND_HEIGHT + EYE_HEIGHT;
+
     // Si la "siguiente posición" NO choca con nada, actualizamos la cámara.
     if (!checkCollision(nextPos)) {
         camera.Position = nextPos;
@@ -451,7 +537,6 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
         {
             Mix_PlayChannel(-1, flashlightSound, 0);
         }
-        std::cout << "Flashlight: " << (flashlightOn ? "ON\n" : "OFF\n");
     }
 }
 
