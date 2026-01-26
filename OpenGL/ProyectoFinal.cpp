@@ -11,6 +11,7 @@
 
 #include <iostream>
 #include <vector>
+#include <windows.h>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <learnopengl/stb_image.h>
@@ -18,6 +19,11 @@
 #define SDL_MAIN_HANDLED
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_mixer.h>
+
+// Forzar uso de GPU dedicada en laptops con GPU 
+extern "C" {
+    __declspec(dllexport) DWORD NvOptimusEnablement = 0x00000001;
+}
 
 void framebuffer_size_callback(GLFWwindow * window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
