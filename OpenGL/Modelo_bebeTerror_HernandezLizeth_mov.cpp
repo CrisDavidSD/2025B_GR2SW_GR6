@@ -88,7 +88,7 @@ int main()
     //Model ourModel(FileSystem::getPath("resources/objects/backpack/backpack.obj"));
     //Model ourModel("C:/Users/User/OneDrive - Escuela Politécnica Nacional/Documentos/Visual Studio 2022/OpenGL/OpenGL/model/backpack/backpack.obj");
     //Model ourModel("model/helicopter/helicopter.obj");
-    Model ourModel("model/edificioB/edificioB.obj");
+    Model ourModel("model/iglesia/iglesia.obj");
     
     
     // draw in wireframe
@@ -128,7 +128,7 @@ int main()
         float yOffset = sin(time * 3.0f) * 0.5f;
 
         glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0.0f, yOffset, -50.0f));
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, -50.0f));
         model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));
 
         ourShader.setMat4("model", model);

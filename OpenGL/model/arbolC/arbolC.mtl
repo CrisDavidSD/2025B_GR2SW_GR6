@@ -1,0 +1,35 @@
+# Blender 5.0.1 MTL File: 'None'
+# www.blender.org
+
+newmtl 08___Default
+Ns 159.999985
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd 08___Default_baseColor.png
+map_Ks 08___Default_baseColor.png
+
+newmtl Material__51
+Ns 159.999985
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+illum 2
+map_Kd Material__51_baseColor.png
+map_d Material__51_baseColor.png
+map_Ks 08___Default_baseColor.png
+
+newmtl wire_204204204
+Ns 159.999985
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd wire_204204204_baseColor.png
+map_Ks 08___Default_baseColor.png

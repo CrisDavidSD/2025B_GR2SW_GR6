@@ -1,0 +1,57 @@
+# Blender 5.0.1 MTL File: 'None'
+# www.blender.org
+
+newmtl Material.001
+Ns 159.999985
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Material_baseColor.jpeg
+map_Ks Material_baseColor.jpeg
+
+newmtl Material.002
+Ns 159.999985
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Material.001_baseColor.jpeg
+map_Ks Material.001_baseColor.jpeg
+
+newmtl Material.003
+Ns 159.999985
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Material.002_baseColor.jpeg
+map_Ks Material.002_baseColor.jpeg
+
+newmtl Material.004
+Ns 159.999985
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Material.003_baseColor.jpeg
+map_Ks Material.003_baseColor.jpeg
+
+newmtl Material.005
+Ns 159.999985
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Material.004_baseColor.jpeg
+map_Ks Material.004_baseColor.jpeg
