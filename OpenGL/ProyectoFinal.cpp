@@ -21,9 +21,9 @@
 #include <SDL2/SDL_mixer.h>
 
 // Forzar uso de GPU dedicada en laptops con GPU 
-//extern "C" {
-//    __declspec(dllexport) DWORD NvOptimusEnablement = 0x00000001;
-//}
+extern "C" {
+    __declspec(dllexport) DWORD NvOptimusEnablement = 0x00000001;
+}
 
 void framebuffer_size_callback(GLFWwindow * window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
@@ -60,6 +60,47 @@ float lastFrame = 0.0f;
 
 // Estado del juego (Progreso)
 int itemsCollected = 0;
+
+// Estructura para definir una zona prohibida
+struct Wall {
+    float minX, maxX;
+    float minZ, maxZ;
+};
+
+// LISTA DE MUROS
+std::vector<Wall> mapWalls = {
+    { -2.06932f,  3.94866f,   10.7121f,  13.9746f },
+    { -2.65907f, -1.76947f,   -1.40436f, 13.7197f },
+    { -16.5053f, -2.57247f,    7.77555f, 13.7702f },
+    { -14.0376f, -8.53279f,    4.45856f,  8.40696f },
+    { -16.7831f, -13.6299f,  -14.9171f,   8.72878f },
+    { -16.3006f, -9.60847f,  -13.5624f,  -7.31482f },
+    { -9.95989f,  3.4585f,   -12.8188f,  -9.98209f },
+    {  3.1686f,   4.86991f,  -13.4659f,  -3.04957f },
+    {  3.1794f,   7.27756f,   -4.1687f,  -3.03074f },
+    {  3.06694f, 10.5866f,   -13.3407f, -11.769f  },
+    { 10.4088f,  21.3489f,   -14.1892f,  -3.27584f },
+    { -15.9309f, -0.476604f,  -4.60152f, -3.75159f },
+    { 18.8284f,  21.4914f,    -4.70449f,  0.698352f},
+    { 20.7644f,  21.7245f,    -0.993197f, 13.684f  },
+    {  3.49084f,  5.58993f,   -1.31225f, 13.79f    },
+    {  3.72947f, 22.3513f,     6.2273f,  13.7062f  },
+    {  7.48924f, 11.0058f,     3.27616f,  5.12232f },
+    { 15.6376f,  18.9299f,     3.46294f,  4.89013f },
+    { -13.6106f, -11.0124f, -0.253142f, 4.45014f },
+};
+
+// Función para verificar si una posición choca con algún muro
+bool checkCollision(glm::vec3 nextPos) {
+    for (const auto& wall : mapWalls) {
+        if (nextPos.x >= wall.minX && nextPos.x <= wall.maxX &&
+            nextPos.z >= wall.minZ && nextPos.z <= wall.maxZ) {
+            return true; 
+        }
+    }
+    return false; 
+}
+
 
 int main()
 {
@@ -99,7 +140,7 @@ int main()
 
     // a) El Entorno (Suelo/Paredes)
     //Model environment("C:/Texturas/model/Town/Untitled.obj");
-    Model environment("model/Pueblo/Pueblo7.obj");
+    Model environment("model/Pueblo/Pueblo10.obj");
 
 
     // b) Los Objetos a recoger
@@ -254,7 +295,7 @@ int main()
         sceneShader.setVec3("spotLight.direction", camera.Front);
         if (flashlightOn)
         {
-            sceneShader.setVec3("spotLight.ambient", 0.05f, 0.05f, 0.05f); // Ambiente bajo (Terror)
+            sceneShader.setVec3("spotLight.ambient", 0.4f, 0.4f, 0.4f); // Ambiente bajo (Terror)
             sceneShader.setVec3("spotLight.diffuse", 0.9f, 0.9f, 0.8f); // Luz blanca
             sceneShader.setVec3("spotLight.specular", 0.2f, 0.2f, 0.2f);
         }
@@ -337,34 +378,45 @@ void processInput(GLFWwindow* window)
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 
-    glm::vec3 position = camera.Position;
-    glm::vec3 oldPosition = position; // ⬅ guardamos posición anterior
+    // 1. Guardamos la posición actual por si acaso
+    glm::vec3 currentPos = camera.Position;
 
-    // Dirección hacia adelante SIN componente Y
+    // 2. Calculamos la "Posición Futura" (nextPos)
+    glm::vec3 nextPos = currentPos;
+
+    // Dirección hacia adelante SIN componente Y (para no volar)
     glm::vec3 forward = camera.Front;
     forward.y = 0.0f;
     forward = glm::normalize(forward);
-
     glm::vec3 right = glm::normalize(glm::cross(forward, camera.Up));
 
     float velocity = camera.MovementSpeed * deltaTime;
 
+    // Calculamos el movimiento deseado
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-        position += forward * velocity;
+        nextPos += forward * velocity;
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-        position -= forward * velocity;
+        nextPos -= forward * velocity;
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        position -= right * velocity;
+        nextPos -= right * velocity;
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        position += right * velocity;
+        nextPos += right * velocity;
+    // Mantenemos la altura fija
+    nextPos.y = GROUND_HEIGHT + EYE_HEIGHT;
+    // Si la "siguiente posición" NO choca con nada, actualizamos la cámara.
+    if (!checkCollision(nextPos)) {
+        camera.Position = nextPos;
+        isMoving = glm::distance(nextPos, currentPos) > 0.0001f;
+    }
+    else {
+        // Si choca, intentamos deslizar (Opcional básico: simplemente no se mueve)
+        isMoving = false;
+    }
 
-    // Altura fija tipo persona
-    position.y = GROUND_HEIGHT + EYE_HEIGHT;
-
-    // Detectar si hubo movimiento real
-    isMoving = glm::distance(position, oldPosition) > 0.0001f;
-
-    camera.Position = position;
+    // Si presionas la tecla P, imprime tu posición en la consola
+    if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS) {
+        std::cout << "Pos: " << nextPos.x << ", " << nextPos.z << std::endl;
+    }
 }
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
