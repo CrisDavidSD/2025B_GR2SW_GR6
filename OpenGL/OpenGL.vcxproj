@@ -129,7 +129,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\OpenGL_Stuff\Library\glad.c" />
-    <ClCompile Include="ProyectoFinal.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\..\..\Downloads\Proyect\shaders\skybox.fs" />
