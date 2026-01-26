@@ -50,5 +50,11 @@
     <None Include="shaders\scene.vs">
       <Filter>Archivos de origen\shaders</Filter>
     </None>
+    <None Include="shaders\rain.vs">
+      <Filter>Archivos de origen\shaders</Filter>
+    </None>
+    <None Include="shaders\rain.fs">
+      <Filter>Archivos de origen\shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

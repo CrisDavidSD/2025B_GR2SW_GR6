@@ -13,6 +13,9 @@
 #include <vector>
 #include <windows.h>
 
+#include <cstdlib>
+#include <ctime>
+
 #define STB_IMAGE_IMPLEMENTATION
 #include <learnopengl/stb_image.h>
 
@@ -58,6 +61,23 @@ const float SCREAMER_DURATION = 2.0f; // Duración del screamer en pantalla
 // Configuración de posición del screamer
 glm::vec3 screamerOffset = glm::vec3(-0.02f, -0.5f, 0.0f); // Sin offset = centrado
 float screamerDistance = 0.5f; // Distancia desde la cámara
+
+// Sistema de Lluvia
+struct RainDrop {
+    glm::vec3 position;
+    float speed;
+    float lifetime;
+};
+
+std::vector<RainDrop> rainDrops;
+const int MAX_RAIN_DROPS = 2000; // Cantidad de gotas
+bool rainEnabled = true; // Activar/desactivar lluvia
+Mix_Chunk* rainSound = nullptr;
+int rainSoundChannel = -1;
+
+// Shader para la lluvia
+Shader* rainShader = nullptr;
+unsigned int rainVAO, rainVBO;
 
 // Cámara
 Camera camera(glm::vec3(0.0f, GROUND_HEIGHT + EYE_HEIGHT, 10.0f));
@@ -145,6 +165,8 @@ int main()
 
     Shader sceneShader("shaders/scene.vs", "shaders/scene.fs");
     Shader skyboxShader("shaders/skybox.vs", "shaders/skybox.fs");
+    // Shader para lluvia
+    rainShader = new Shader("shaders/rain.vs", "shaders/rain.fs");
 
 
     stbi_set_flip_vertically_on_load(false); // Flip para modelos .obj
@@ -161,6 +183,25 @@ int main()
 
     // Cargar modelo del screamer
     screamerModel = new Model("model/bebeTerror/bebeTerror.obj");
+
+    // Inicializar gotas de lluvia
+    srand(time(NULL)); // Para números aleatorios
+    for (int i = 0; i < MAX_RAIN_DROPS; i++) {
+        RainDrop drop;
+        // Posición aleatoria alrededor del jugador
+        drop.position = glm::vec3(
+            (rand() % 40) - 20.0f,  // X: -20 a 20
+            (rand() % 30) + 5.0f,   // Y: 5 a 35 (altura)
+            (rand() % 40) - 20.0f   // Z: -20 a 20
+        );
+        drop.speed = 8.0f + (rand() % 100) / 100.0f * 4.0f; // Velocidad variable
+        drop.lifetime = 1.0f;
+        rainDrops.push_back(drop);
+    }
+
+    // Configurar geometría de gotas (líneas simples)
+    glGenVertexArrays(1, &rainVAO);
+    glGenBuffers(1, &rainVBO);
 
     stbi_set_flip_vertically_on_load(false); // Desactivar flip para el skybox
 
@@ -249,6 +290,19 @@ int main()
         std::cout << "Error cargando sonido de screamer\n";
     }
 
+    // Cargar sonido de lluvia
+    rainSound = Mix_LoadWAV("audio/rain.wav");
+    if (!rainSound)
+    {
+        std::cout << "Error cargando sonido de lluvia\n";
+    }
+    else
+    {
+        // Reproducir lluvia en loop
+        rainSoundChannel = Mix_PlayChannel(-1, rainSound, -1); // -1 = loop infinito
+        Mix_Volume(rainSoundChannel, 30); // Volumen moderado
+    }
+
     // Game Loop
 
     while (!glfwWindowShouldClose(window))
@@ -288,6 +342,35 @@ int main()
             if (screamerTimer >= SCREAMER_DURATION)
             {
                 Mix_VolumeMusic(ambientBaseVolume);
+            }
+        }
+
+        // ACTUALIZAR LLUVIA
+        if (rainEnabled) {
+            for (auto& drop : rainDrops) {
+                // Actualizar posición (caída)
+                drop.position.y -= drop.speed * deltaTime;
+
+                // Si la gota llega al suelo o está muy abajo
+                if (drop.position.y < GROUND_HEIGHT) {
+                    // Resetear gota arriba de la cámara
+                    drop.position.x = camera.Position.x + (rand() % 40) - 20.0f;
+                    drop.position.y = camera.Position.y + 15.0f + (rand() % 15);
+                    drop.position.z = camera.Position.z + (rand() % 40) - 20.0f;
+                    drop.speed = 8.0f + (rand() % 100) / 100.0f * 4.0f;
+                }
+
+                // Mantener gotas cerca del jugador (efecto seguir cámara)
+                glm::vec3 toCamera = camera.Position - drop.position;
+                toCamera.y = 0; // Solo en plano XZ
+                float distance = glm::length(toCamera);
+
+                // Si está muy lejos, reposicionar
+                if (distance > 25.0f) {
+                    drop.position.x = camera.Position.x + (rand() % 40) - 20.0f;
+                    drop.position.y = camera.Position.y + 15.0f + (rand() % 15);
+                    drop.position.z = camera.Position.z + (rand() % 40) - 20.0f;
+                }
             }
         }
 
@@ -423,6 +506,55 @@ int main()
             screamerModel->Draw(sceneShader);
         }
 
+        // DIBUJAR LLUVIA
+        if (rainEnabled && rainShader) {
+            // Habilitar blending para transparencia
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+            rainShader->use();
+            rainShader->setMat4("projection", projection);
+            rainShader->setMat4("view", view);
+
+            // Pasar información de la linterna al shader de lluvia
+            rainShader->setVec3("spotLightPos", camera.Position);
+            rainShader->setVec3("spotLightDir", camera.Front);
+            rainShader->setVec3("spotLightColor", glm::vec3(0.9f, 0.9f, 0.8f));
+            rainShader->setFloat("spotLightCutOff", glm::cos(glm::radians(10.0f)));
+            rainShader->setFloat("spotLightOuterCutOff", glm::cos(glm::radians(15.0f)));
+            rainShader->setBool("flashlightOn", flashlightOn);
+
+            // Preparar datos de vértices para todas las gotas
+            std::vector<float> rainVertices;
+            for (const auto& drop : rainDrops) {
+                // Punto superior de la gota
+                rainVertices.push_back(drop.position.x);
+                rainVertices.push_back(drop.position.y);
+                rainVertices.push_back(drop.position.z);
+
+                // Punto inferior (línea de la gota)
+                rainVertices.push_back(drop.position.x);
+                rainVertices.push_back(drop.position.y - 0.3f); // Longitud de la gota
+                rainVertices.push_back(drop.position.z);
+            }
+
+            // Actualizar buffer
+            glBindVertexArray(rainVAO);
+            glBindBuffer(GL_ARRAY_BUFFER, rainVBO);
+            glBufferData(GL_ARRAY_BUFFER, rainVertices.size() * sizeof(float),
+                rainVertices.data(), GL_DYNAMIC_DRAW);
+
+            glEnableVertexAttribArray(0);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+
+            // Dibujar líneas con grosor ajustado
+            glLineWidth(1.5f);
+            glDrawArrays(GL_LINES, 0, rainDrops.size() * 2);
+            glBindVertexArray(0);
+
+            glDisable(GL_BLEND);
+        }
+
         // FASE 2: DIBUJAR SKYBOX 
 
         glDepthFunc(GL_LEQUAL);
@@ -446,10 +578,14 @@ int main()
 
     //Limpieza SDL_mixer
     if (screamerModel) delete screamerModel;
+    if (rainShader) delete rainShader;
     Mix_FreeChunk(screamerSound);
     Mix_FreeChunk(flashlightSound);
     Mix_FreeChunk(footstepSound);
+    Mix_FreeChunk(rainSound);
     Mix_FreeMusic(ambientMusic);
+    glDeleteVertexArrays(1, &rainVAO);
+    glDeleteBuffers(1, &rainVBO);
     Mix_CloseAudio();
     SDL_Quit();
 
@@ -502,6 +638,28 @@ void processInput(GLFWwindow* window)
     // Si presionas la tecla P, imprime tu posición en la consola
     if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS) {
         std::cout << "Pos: " << nextPos.x << ", " << nextPos.z << std::endl;
+    }
+
+    // Toggle lluvia con tecla R
+    static bool rKeyPressed = false;
+    if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS && !rKeyPressed) {
+        rainEnabled = !rainEnabled;
+        rKeyPressed = true;
+
+        // Control de sonido
+        if (rainEnabled && rainSoundChannel == -1) {
+            rainSoundChannel = Mix_PlayChannel(-1, rainSound, -1);
+            Mix_Volume(rainSoundChannel, 30);
+        }
+        else if (!rainEnabled && rainSoundChannel != -1) {
+            Mix_HaltChannel(rainSoundChannel);
+            rainSoundChannel = -1;
+        }
+
+        std::cout << "Rain: " << (rainEnabled ? "ON" : "OFF") << "\n";
+    }
+    if (glfwGetKey(window, GLFW_KEY_R) == GLFW_RELEASE) {
+        rKeyPressed = false;
     }
 }
 
