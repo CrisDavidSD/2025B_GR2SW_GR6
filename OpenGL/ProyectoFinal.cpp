@@ -34,6 +34,10 @@ const float EYE_HEIGHT = 0.6f;
 bool flashlightOn = true;
 bool leftMousePressed = false;
 Mix_Chunk* flashlightSound = nullptr;
+Mix_Chunk* footstepSound = nullptr;
+float stepTimer = 0.0f;
+float stepInterval = 0.60f; // tiempo entre pasos (ajustable)
+bool isMoving = false;
 
 // Cámara
 Camera camera(glm::vec3(0.0f, GROUND_HEIGHT + EYE_HEIGHT, 10.0f));
@@ -155,6 +159,13 @@ int main()
         std::cout << "Error cargando sonido de linterna\n";
     }
 
+    // Cargar sonido de pasos
+    footstepSound = Mix_LoadWAV("audio/footstep.wav");
+    if (!footstepSound)
+    {
+        std::cout << "Error cargando sonido de pasos\n";
+    }
+
     // Game Loop
 
     while (!glfwWindowShouldClose(window))
@@ -166,13 +177,27 @@ int main()
 
         processInput(window);
 
+        // SONIDO DE PASOS
+        if (isMoving && footstepSound)
+        {
+            stepTimer += deltaTime;
+
+            if (stepTimer >= stepInterval)
+            {
+                Mix_PlayChannel(-1, footstepSound, 0);
+                stepTimer = 0.0f;
+            }
+        }
+        else
+        {
+            stepTimer = stepInterval; // evita retraso al volver a moverse
+        }
+
         // Limpiar pantalla (Fondo negro)
         glClearColor(fogColorVector.x, fogColorVector.y, fogColorVector.z, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // ============================================
         // FASE 1: DIBUJAR ESCENA (CON LINTERNA)
-        // ============================================
         sceneShader.use();
 
         sceneShader.setVec3("fogColor", fogColorVector);
@@ -254,6 +279,7 @@ int main()
 
     //Limpieza SDL_mixer
     Mix_FreeChunk(flashlightSound);
+    Mix_FreeChunk(footstepSound);
     Mix_CloseAudio();
     SDL_Quit();
 
@@ -267,6 +293,7 @@ void processInput(GLFWwindow* window)
         glfwSetWindowShouldClose(window, true);
 
     glm::vec3 position = camera.Position;
+    glm::vec3 oldPosition = position; // ⬅ guardamos posición anterior
 
     // Dirección hacia adelante SIN componente Y
     glm::vec3 forward = camera.Front;
@@ -288,6 +315,9 @@ void processInput(GLFWwindow* window)
 
     // Altura fija tipo persona
     position.y = GROUND_HEIGHT + EYE_HEIGHT;
+
+    // Detectar si hubo movimiento real
+    isMoving = glm::distance(position, oldPosition) > 0.0001f;
 
     camera.Position = position;
 }
@@ -324,7 +354,6 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
         {
             Mix_PlayChannel(-1, flashlightSound, 0);
         }
-
         std::cout << "Flashlight: " << (flashlightOn ? "ON\n" : "OFF\n");
     }
 }
