@@ -173,7 +173,7 @@ int main()
 
     // a) El Entorno (Suelo/Paredes)
     //Model environment("C:/Texturas/model/Town/Untitled.obj");
-    Model environment("model/Pueblo/Pueblo10.obj");
+    Model environment("model/Pasillo/Pasillos2.gltf");
 
 
     // b) Los Objetos a recoger
@@ -318,7 +318,7 @@ int main()
         gameTime += deltaTime;
 
         // Trigger del screamer a los 7 segundos
-        if (!screamerTriggered && gameTime >= 90.0f)
+        if (!screamerTriggered && gameTime >= 50.0f)
         {
             screamerTriggered = true;
             screamerTimer = 0.0f;
@@ -389,7 +389,7 @@ int main()
         {
             stepTimer = stepInterval; // evita retraso al volver a moverse
         }
-
+        
         // SONIDO AMBIENTE DINÁMICO
         int targetVolume = ambientBaseVolume;
 
@@ -430,9 +430,9 @@ int main()
         sceneShader.setVec3("spotLight.direction", camera.Front);
         if (flashlightOn)
         {
-            sceneShader.setVec3("spotLight.ambient", 0.4f, 0.4f, 0.4f); // Ambiente bajo (Terror)
-            sceneShader.setVec3("spotLight.diffuse", 0.9f, 0.9f, 0.8f); // Luz blanca
-            sceneShader.setVec3("spotLight.specular", 0.2f, 0.2f, 0.2f);
+            sceneShader.setVec3("spotLight.ambient", 1.0f, 1.0f, 1.0f); // Ambiente bajo (Terror)
+            sceneShader.setVec3("spotLight.diffuse", 0.2f, 0.2f, 0.2f); // Luz blanca
+            sceneShader.setVec3("spotLight.specular", 0.9f, 0.9f, 0.9f);
         }
         else
         {
@@ -457,7 +457,7 @@ int main()
         // 1. Dibujar Entorno (Suelo)
         glm::mat4 model = glm::mat4(1.0f);
         model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f)); // Bajar un poco el suelo
-        model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));
+        model = glm::scale(model, glm::vec3(1.0f));
         sceneShader.setMat4("model", model);
         environment.Draw(sceneShader);
 
@@ -606,7 +606,7 @@ void processInput(GLFWwindow* window)
 
     // Dirección hacia adelante SIN componente Y (para no volar)
     glm::vec3 forward = camera.Front;
-    forward.y = 0.0f;
+    ///forward.y = 0.0f;
     forward = glm::normalize(forward);
     glm::vec3 right = glm::normalize(glm::cross(forward, camera.Up));
 
@@ -623,17 +623,17 @@ void processInput(GLFWwindow* window)
         nextPos += right * velocity;
 
     // Mantenemos la altura fija
-    nextPos.y = GROUND_HEIGHT + EYE_HEIGHT;
+    ///nextPos.y = GROUND_HEIGHT + EYE_HEIGHT;
 
-    // Si la "siguiente posición" NO choca con nada, actualizamos la cámara.
-    if (!checkCollision(nextPos)) {
+    //// Si la "siguiente posición" NO choca con nada, actualizamos la cámara.
+    //if (!checkCollision(nextPos)) {
         camera.Position = nextPos;
         isMoving = glm::distance(nextPos, currentPos) > 0.0001f;
-    }
-    else {
-        // Si choca, intentamos deslizar (Opcional básico: simplemente no se mueve)
-        isMoving = false;
-    }
+    //}
+    //else {
+    //    // Si choca, intentamos deslizar (Opcional básico: simplemente no se mueve)
+    //    isMoving = false;
+    //}
 
     // Si presionas la tecla P, imprime tu posición en la consola
     if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS) {
