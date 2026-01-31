@@ -39,7 +39,7 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 const unsigned int SCR_WIDTH = 1280;
 const unsigned int SCR_HEIGHT = 720;
 const float GROUND_HEIGHT = 0.0f;
-const float EYE_HEIGHT = 0.6f;
+const float EYE_HEIGHT = -0.75f;
 bool flashlightOn = true;
 bool leftMousePressed = false;
 Mix_Chunk* flashlightSound = nullptr;
@@ -173,7 +173,7 @@ int main()
 
     // a) El Entorno (Suelo/Paredes)
     //Model environment("C:/Texturas/model/Town/Untitled.obj");
-    Model environment("model/Pasillo/Pasillos2.gltf");
+    Model environment("model/Pasillo/Pasillos.gltf");
 
 
     // b) Los Objetos a recoger
@@ -456,7 +456,7 @@ int main()
 
         // 1. Dibujar Entorno (Suelo)
         glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f)); // Bajar un poco el suelo
+        model = glm::translate(model, glm::vec3(0.0f, GROUND_HEIGHT, 0.0f)); // Bajar un poco el suelo
         model = glm::scale(model, glm::vec3(1.0f));
         sceneShader.setMat4("model", model);
         environment.Draw(sceneShader);
@@ -623,7 +623,7 @@ void processInput(GLFWwindow* window)
         nextPos += right * velocity;
 
     // Mantenemos la altura fija
-    ///nextPos.y = GROUND_HEIGHT + EYE_HEIGHT;
+    nextPos.y = GROUND_HEIGHT + EYE_HEIGHT;
 
     //// Si la "siguiente posición" NO choca con nada, actualizamos la cámara.
     //if (!checkCollision(nextPos)) {
