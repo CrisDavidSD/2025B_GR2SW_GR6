@@ -80,7 +80,7 @@ Shader* rainShader = nullptr;
 unsigned int rainVAO, rainVBO;
 
 // Cámara
-Camera camera(glm::vec3(0.0f, GROUND_HEIGHT + EYE_HEIGHT, 10.0f));
+Camera camera(glm::vec3(-8.0f, GROUND_HEIGHT + EYE_HEIGHT, -0.21f));
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
