@@ -102,7 +102,11 @@ std::vector<Lamp> lamps = {
     {{-9.39945f, -0.75f,-34.2173f}, -90.0f},
     {{-13.2559f, -0.75f,-25.0242f}, 0.0f},
     {{-15.6580f, -0.75f,-21.8439f}, -90.0f},
-    {{-6.11057f, -0.75f,-21.8438f},   -90.0f}
+    {{-6.11057f, -0.75f,-21.8438f},   -90.0f},
+    {{ -14.1613f, -0.75f,-13.6656f }, -90.0f }, // 0
+    {{-22.2525f, -0.75f,-13.6663f}, -90.0f},
+    {{-35.9731f, -0.75f,-15.6658f},   00.0f} // -90 -180
+
 };
 
 // Sistema de Lluvia
@@ -755,7 +759,13 @@ int main()
         }
 
         // Calcular Flicker (Parpadeo) de las lámparas
-        float flicker = 0.6f + 0.4f * sin(glfwGetTime() * 5.0f) + 0.2f * sin(glfwGetTime() * 14.0f);
+        float t = glfwGetTime();
+
+        float flicker =
+            0.55f +
+            0.35f * sin(t * 1.1f) +
+            0.15f * sin(t * 2.9f) +
+            0.05f * sin(t * 11.0f);
 
         // --- LÓGICA DEL ÁNGEL ---
         if (gameState == JUGANDO && !angelGone && !angelEventActive) {
@@ -844,16 +854,31 @@ int main()
             sceneShader->use();
 
             // --- ENVIAR LUCES DE LÁMPARAS AL SHADER ---
+
             sceneShader->setInt("numPointLights", lamps.size());
+
             for (int i = 0; i < lamps.size(); i++)
             {
                 std::string idx = "pointLights[" + std::to_string(i) + "]";
-                sceneShader->setVec3(idx + ".position", lamps[i].pos + glm::vec3(0.0f, 0.4f, 0.0f));
 
-                // Luz tenue con flicker
-                sceneShader->setVec3(idx + ".ambient", glm::vec3(0.04f * flicker));
-                sceneShader->setVec3(idx + ".diffuse", glm::vec3(0.55f * flicker, 0.45f * flicker, 0.32f * flicker));
-                sceneShader->setVec3(idx + ".specular", glm::vec3(0.28f * flicker));
+                glm::vec3 bulbOffset = glm::vec3(0.0f, 0.75f, -0.25f);
+
+                glm::mat4 lightMat = glm::mat4(1.0f);
+                lightMat = glm::translate(lightMat, lamps[i].pos);
+                lightMat = glm::rotate(
+                    lightMat,
+                    glm::radians(lamps[i].rotY),
+                    glm::vec3(0.0f, 1.0f, 0.0f)
+                );
+
+                glm::vec3 lightPos =
+                    glm::vec3(lightMat * glm::vec4(bulbOffset, 1.0f));
+
+                sceneShader->setVec3(idx + ".position", lightPos);
+
+                sceneShader->setVec3(idx + ".ambient", glm::vec3(0.02f * flicker));
+                sceneShader->setVec3(idx + ".diffuse", glm::vec3(0.85f * flicker, 0.75f * flicker, 0.55f * flicker));
+                sceneShader->setVec3(idx + ".specular", glm::vec3(0.5f * flicker));
 
                 sceneShader->setFloat(idx + ".constant", 1.0f);
                 sceneShader->setFloat(idx + ".linear", 0.09f);
