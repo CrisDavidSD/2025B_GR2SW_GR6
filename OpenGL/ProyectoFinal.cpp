@@ -157,6 +157,47 @@ bool isWalkable(glm::vec3 nextPos) {
     return false;
 }
 
+struct Lamp {
+    glm::vec3 pos;
+    float rotY;
+};
+    
+// Carga posiciones lampara
+std::vector<Lamp> lamps = {
+    {{-3.65768f, -0.75f,  5.56654f},  90.0f}, 
+    {{ 3.72922f, -0.75f,  1.19345f}, 180.0f},  
+    {{ 3.72544f, -0.75f, -8.0755}, 180.0f},
+    {{ 9.46805f, -0.75f,  5.56654f}, 90.0f},   
+    {{15.65700f, -0.75f,  2.95896f}, -90.0f}, 
+    {{23.27900f, -0.75f,  5.26618f}, 90.0f}, 
+    {{22.22610f, -0.75f, -6.51624f}, 00.0f}, 
+    {{22.11870f, -0.75f,-12.51980f}, 00.0f}, 
+    {{12.17610f, -0.75f,-18.7778f},   0.0f}, 
+    {{ 5.15026f, -0.75f,-15.49330f},   -90.0f}, 
+    {{ 0.86502f, -0.75f,-19.59110f},   -90.0f}, 
+    {{-9.39945f, -0.75f,-34.2173f}, -90.0f},
+    {{-13.2559f, -0.75f,-25.0242f}, 00.0f}, 
+    {{-15.6580f, -0.75f,-21.8439f}, -90.0f}, 
+    {{-6.11057f, -0.75f,-21.8438f},   -90.0f} 
+};
+
+float offset = 0.25f; // prueba valores pequeños
+
+float getLampRotationY(const glm::vec3& pos)
+{
+    // Paredes en Z (mirando ±X)
+    if (fabs(pos.z - 5.26f) < 0.5f || fabs(pos.z + 21.64f) < 0.5f)
+        return 90.0f;
+
+    // Paredes en X (mirando ±Z)
+    if (fabs(pos.x - 23.27f) < 0.5f || fabs(pos.x + 10.51f) < 0.5f)
+        return 0.0f;
+
+    // Fallback
+    return 90.0f;
+}
+
+
 int main()
 {
     glfwInit();
@@ -196,6 +237,8 @@ int main()
     Model environment("model/Pasillo/Pasillos.gltf");
     Model item1("model/farola/farola.obj");
     Model item2("model/farola/farola.obj");
+    Model lampModel("model/lampara1/lampara1.obj");
+
     screamerModel = new Model("model/bebeTerror/bebeTerror.obj");
 
     // Inicializar Lluvia
@@ -264,6 +307,8 @@ int main()
         Mix_Volume(rainSoundChannel, 30);
     }
 
+    float lampFlickerTime = 0.0f;
+
     // GAME LOOP
     while (!glfwWindowShouldClose(window))
     {
@@ -273,6 +318,22 @@ int main()
 
         processInput(window);
         gameTime += deltaTime;
+
+        lampFlickerTime += deltaTime;
+
+        // flicker suave + caos
+        /*
+        float flicker =
+            0.8f +
+            sin(lampFlickerTime * 12.0f) * 0.15f +
+            sin(lampFlickerTime * 37.0f) * 0.05f;
+        */
+        float time = glfwGetTime();
+
+        // Flicker más marcado
+        float flicker = 0.6f + 0.4f * sin(time * 5.0f)
+            + 0.2f * sin(time * 14.0f);
+
 
         // --- 1. LÓGICA DE RECOLECCIÓN ---
         if (!haveItem1 && glm::distance(camera.Position, item1Pos) < 1.5f) {
@@ -330,6 +391,28 @@ int main()
 
         sceneShader.use();
 
+        sceneShader.setInt("numPointLights", lamps.size());
+
+        for (int i = 0; i < lamps.size(); i++)
+        {
+            std::string idx = "pointLights[" + std::to_string(i) + "]";
+
+            sceneShader.setVec3(idx + ".position", lamps[i].pos + glm::vec3(0.0f, 0.4f, 0.0f));
+
+
+            sceneShader.setVec3(idx + ".ambient",glm::vec3(0.04f * flicker));
+
+            sceneShader.setVec3(idx + ".diffuse",glm::vec3(0.55f * flicker,0.45f * flicker,0.32f * flicker));
+
+            sceneShader.setVec3(idx + ".specular",glm::vec3(0.28f * flicker));
+
+
+            sceneShader.setFloat(idx + ".constant", 1.0f);
+            sceneShader.setFloat(idx + ".linear", 0.09f);
+            sceneShader.setFloat(idx + ".quadratic", 0.032f);
+        }
+
+
         // Logica simple para niebla (sin función externa para simplificar)
         if (itemsCollected == 1) fogColorVector = glm::vec3(0.01f, 0.01f, 0.02f);
         if (itemsCollected >= 2) fogColorVector = glm::vec3(0.0f, 0.0f, 0.0f);
@@ -341,8 +424,8 @@ int main()
 
         if (flashlightOn) {
             sceneShader.setVec3("spotLight.ambient", 0.9f, 0.9f, 0.9f);
-            sceneShader.setVec3("spotLight.diffuse", 0.4f, 0.4f, 0.4f);
-            sceneShader.setVec3("spotLight.specular", 0.9f, 0.9f, 0.9f);
+            sceneShader.setVec3("spotLight.diffuse", 0.6f, 0.6f, 0.6f);
+            sceneShader.setVec3("spotLight.specular", 1.0f, 1.0f, 1.0f);
         }
         else {
             sceneShader.setVec3("spotLight.ambient", 0.0f, 0.0f, 0.0f);
@@ -383,6 +466,32 @@ int main()
             sceneShader.setMat4("model", model);
             item2.Draw(sceneShader);
         }
+
+        // =======================
+        // DIBUJAR LÁMPARAS
+        // =======================
+        for (const Lamp& lamp : lamps)
+        {
+            glm::mat4 model = glm::mat4(1.0f);
+
+            model = glm::translate(
+                model,
+                lamp.pos + glm::vec3(0.0f, 0.75f, 0.0f)
+            );
+
+            model = glm::rotate(
+                model,
+                glm::radians(lamp.rotY),
+                glm::vec3(0, 1, 0)
+            );
+
+            model = glm::translate(model, glm::vec3(0.0f, 0.0f, -offset));
+            model = glm::scale(model, glm::vec3(0.4f));
+
+            sceneShader.setMat4("model", model);
+            lampModel.Draw(sceneShader);
+        }
+
 
         // Dibujar Screamer
         if (screamerTriggered && screamerTimer < SCREAMER_DURATION && screamerModel)
