@@ -84,12 +84,25 @@ float angelTimer = 0.0f;
 // ---------------------------------------------------------
 // --- SISTEMA DE OBJETOS CON MOVIMIENTO (DynamicProp) ---
 // ---------------------------------------------------------
+
+// 1. Tipos de Modelos Disponibles
+enum PropModelType {
+    MODEL_ANGEL,
+    MODEL_SCREAMER, // Bebé
+    MODEL_ITEM,     // Calavera/Farola
+    MODEL_LAMP,    // Lámpara
+	MODEL_MUJER    // Mujer Terrorífica
+};
+
 struct DynamicProp {
     glm::vec3 startPos;
     glm::vec3 moveDir;
     float triggerDist;
     float speed;
     float lifeTime;
+    glm::vec3 scale;
+    float rotationOffset; // <--- NUEVO: Rotación extra en grados (Ej: 90.0f)
+    PropModelType modelType;
 
     // Variables internas
     glm::vec3 currentPos;
@@ -98,26 +111,31 @@ struct DynamicProp {
     float timeAlive;
 };
 
-// Configuración de objetos móviles
+// 2. CONFIGURACIÓN DE TUS OBJETOS DINÁMICOS
+// Formato: { Posicion, Direccion, DistanciaActivacion, Velocidad, TiempoVida, Escala, TIPO_MODELO, ...internas... }
 std::vector<DynamicProp> dynamicProps = {
-    // 1. Cruza pasillo izquierda
-    { glm::vec3(10.0f, -0.5f, 0.0f), glm::vec3(-1.0f, 0.0f, 0.0f), 4.0f, 3.0f, 2.5f, glm::vec3(0), false, false, 0.0f },
-    // 2. Cae del techo
-    { glm::vec3(-5.0f, 2.0f, -5.0f), glm::vec3(0.0f, -1.0f, 0.0f), 3.0f, 5.0f, 1.0f, glm::vec3(0), false, false, 0.0f },
-    // 3. Se aleja al fondo
-    { glm::vec3(2.0f, -0.5f, -10.0f), glm::vec3(0.0f, 0.0f, -1.0f), 5.0f, 6.0f, 3.0f, glm::vec3(0), false, false, 0.0f }
+    // Objeto 3: Una Calavera flotando
+    {
+        glm::vec3(0.930715f, -1.5f, 4.3562f),
+        glm::vec3(1.0f, 0.0f, 0.0f),  // Viene hacia ti
+        5.0f, 100.0f, 2.0f,
+        glm::vec3(1.0f),              // Escala pequeña
+		180.0f,                     // Rotación extra de 90 grados
+        MODEL_MUJER,
+        glm::vec3(0), false, false, 0.0f
+    }
 };
 
 void resetDynamicProps() {
     for (auto& prop : dynamicProps) {
-        prop.currentPos = prop.startPos;
+        prop.currentPos = prop.startPos; // Reiniciar posición
         prop.isTriggered = false;
         prop.isFinished = false;
         prop.timeAlive = 0.0f;
     }
 }
 
-// --- SISTEMA DE LÁMPARAS (Actualizado con las de tu compañera) ---
+// --- SISTEMA DE LÁMPARAS ---
 struct Lamp {
     glm::vec3 pos;
     float rotY;
@@ -139,7 +157,6 @@ std::vector<Lamp> lamps = {
     {{-13.2559f, -0.75f,-25.0242f}, 0.0f},
     {{-15.6580f, -0.75f,-21.8439f}, -90.0f},
     {{-6.11057f, -0.75f,-21.8438f},   -90.0f},
-    // --- NUEVAS AGREGADAS POR TU COMPAÑERA ---
     {{ -14.1613f, -0.75f,-13.6656f }, -90.0f },
     {{-22.2525f, -0.75f,-13.6663f}, -90.0f},
     {{-35.9731f, -0.75f,-15.6658f},   0.0f}
@@ -261,6 +278,7 @@ GLFWwindow* gWindow = nullptr;
 Model* environment = nullptr;
 Model* itemModel = nullptr;
 Model* lampModel = nullptr;
+Model* mujerModel = nullptr;
 Shader* sceneShader = nullptr;
 Shader* skyboxShader = nullptr;
 unsigned int skyboxVAO = 0, skyboxVBO = 0;
@@ -362,7 +380,6 @@ void drawMenuScreen()
         gameTime = 0.0f;
         screamerTriggered = false;
 
-        // --- Reiniciar Props Moviles ---
         resetDynamicProps();
     }
 
@@ -538,6 +555,7 @@ void loadResources()
     loadingProgress = 0.5f;
     itemModel = new Model("model/calavera/calavera.obj");
     lampModel = new Model("model/lampara1/lampara1.obj");
+    mujerModel = new Model("model/mujerTerror/mujerTerror.obj");
 
     loadingProgress = 0.65f;
     screamerModel = new Model("model/bebeTerror/bebeTerror.obj");
@@ -681,7 +699,7 @@ int main()
 
         float flicker = 0.6f + 0.4f * sin(glfwGetTime() * 5.0f) + 0.2f * sin(glfwGetTime() * 14.0f);
 
-        // --- ACTUALIZAR PROPS MÓVILES ---
+        // --- ACTUALIZAR PROPS MÓVILES (NUEVO) ---
         if (gameState == JUGANDO) {
             for (auto& prop : dynamicProps) {
                 if (prop.isFinished) continue;
@@ -690,6 +708,7 @@ int main()
                     // Checar distancia
                     if (glm::distance(camera.Position, prop.startPos) < prop.triggerDist) {
                         prop.isTriggered = true;
+                        // Opcional: Sonido al activarse
                     }
                 }
                 else {
@@ -726,37 +745,60 @@ int main()
             }
         }
 
+        // Actualizar timer del screamer
         if (gameState == JUGANDO && screamerTriggered && screamerTimer < SCREAMER_DURATION) {
             screamerTimer += deltaTime; if (screamerTimer >= SCREAMER_DURATION) Mix_VolumeMusic(ambientBaseVolume);
         }
 
-        if (gameState == JUGANDO && isMoving && footstepSound) {
-            stepTimer += deltaTime; if (stepTimer >= stepInterval) { Mix_PlayChannel(-1, footstepSound, 0); stepTimer = 0.0f; }
+        // SONIDO DE PASOS (SOLO si está jugando)
+        if (gameState == JUGANDO && isMoving && footstepSound)
+        {
+            stepTimer += deltaTime;
+            if (stepTimer >= stepInterval) { Mix_PlayChannel(-1, footstepSound, 0); stepTimer = 0.0f; }
         }
-        else { stepTimer = stepInterval; }
-
-        if (gameState == JUGANDO) {
-            int targetVolume = ambientBaseVolume; if (isMoving) targetVolume -= 10; if (!flashlightOn) targetVolume += 10;
-            if (targetVolume < 10) targetVolume = 10; if (targetVolume > 70) targetVolume = 70;
-            ambientCurrentVolume += (targetVolume - ambientCurrentVolume) * 0.05f; Mix_VolumeMusic(ambientCurrentVolume);
+        else
+        {
+            stepTimer = stepInterval;
         }
 
+        // SONIDO AMBIENTE DINÁMICO (SOLO si está jugando)
+        if (gameState == JUGANDO)
+        {
+            int targetVolume = ambientBaseVolume;
+            if (isMoving) targetVolume -= 10;
+            if (!flashlightOn) targetVolume += 10;
+            if (targetVolume < 10) targetVolume = 10;
+            if (targetVolume > 70) targetVolume = 70;
+            ambientCurrentVolume += (targetVolume - ambientCurrentVolume) * 0.05f;
+            Mix_VolumeMusic(ambientCurrentVolume);
+        }
+
+        // --- RENDER ---
         glClearColor(fogColorVector.x, fogColorVector.y, fogColorVector.z, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         if (gameState == JUGANDO || gameState == PAUSED)
         {
             sceneShader->use();
+
+            // --- ENVIAR LUCES DE LÁMPARAS AL SHADER ---
             sceneShader->setInt("numPointLights", lamps.size());
-            for (int i = 0; i < lamps.size(); i++) {
+            for (int i = 0; i < lamps.size(); i++)
+            {
                 std::string idx = "pointLights[" + std::to_string(i) + "]";
                 sceneShader->setVec3(idx + ".position", lamps[i].pos + glm::vec3(0.0f, 0.4f, 0.0f));
+
+                // Luz tenue con flicker
                 sceneShader->setVec3(idx + ".ambient", glm::vec3(0.04f * flicker));
                 sceneShader->setVec3(idx + ".diffuse", glm::vec3(0.55f * flicker, 0.45f * flicker, 0.32f * flicker));
                 sceneShader->setVec3(idx + ".specular", glm::vec3(0.28f * flicker));
-                sceneShader->setFloat(idx + ".constant", 1.0f); sceneShader->setFloat(idx + ".linear", 0.09f); sceneShader->setFloat(idx + ".quadratic", 0.032f);
+
+                sceneShader->setFloat(idx + ".constant", 1.0f);
+                sceneShader->setFloat(idx + ".linear", 0.09f);
+                sceneShader->setFloat(idx + ".quadratic", 0.032f);
             }
 
+            // Niebla
             if (itemsCollected == 0) fogColorVector = glm::vec3(0.05f, 0.05f, 0.05f);
             else if (itemsCollected == 1) fogColorVector = glm::vec3(0.03f, 0.03f, 0.04f);
             else if (itemsCollected == 2) fogColorVector = glm::vec3(0.01f, 0.01f, 0.02f);
@@ -767,8 +809,16 @@ int main()
             sceneShader->setVec3("spotLight.position", camera.Position);
             sceneShader->setVec3("spotLight.direction", camera.Front);
 
-            if (flashlightOn) { sceneShader->setVec3("spotLight.ambient", 0.9f, 0.9f, 0.9f); sceneShader->setVec3("spotLight.diffuse", 0.4f, 0.4f, 0.4f); sceneShader->setVec3("spotLight.specular", 0.9f, 0.9f, 0.9f); }
-            else { sceneShader->setVec3("spotLight.ambient", 0.0f, 0.0f, 0.0f); sceneShader->setVec3("spotLight.diffuse", 0.0f, 0.0f, 0.0f); sceneShader->setVec3("spotLight.specular", 0.0f, 0.0f, 0.0f); }
+            if (flashlightOn) {
+                sceneShader->setVec3("spotLight.ambient", 0.9f, 0.9f, 0.9f);
+                sceneShader->setVec3("spotLight.diffuse", 0.4f, 0.4f, 0.4f);
+                sceneShader->setVec3("spotLight.specular", 0.9f, 0.9f, 0.9f);
+            }
+            else {
+                sceneShader->setVec3("spotLight.ambient", 0.0f, 0.0f, 0.0f);
+                sceneShader->setVec3("spotLight.diffuse", 0.0f, 0.0f, 0.0f);
+                sceneShader->setVec3("spotLight.specular", 0.0f, 0.0f, 0.0f);
+            }
 
             sceneShader->setFloat("spotLight.constant", 1.0f);
             sceneShader->setFloat("spotLight.linear", (itemsCollected > 0) ? 0.14f : 0.022f);
@@ -778,93 +828,289 @@ int main()
 
             glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)mode->width / (float)mode->height, 0.1f, 100.0f);
             glm::mat4 view = camera.GetViewMatrix();
-            sceneShader->setMat4("projection", projection); sceneShader->setMat4("view", view);
+            sceneShader->setMat4("projection", projection);
+            sceneShader->setMat4("view", view);
 
+            // Dibujar Entorno
             glm::mat4 model = glm::mat4(1.0f);
             model = glm::translate(model, glm::vec3(0.0f, GROUND_HEIGHT, 0.0f));
             sceneShader->setMat4("model", model);
             if (environment) environment->Draw(*sceneShader);
 
-            for (const Lamp& lamp : lamps) {
-                model = glm::mat4(1.0f); model = glm::translate(model, lamp.pos + glm::vec3(0.0f, 0.75f, 0.0f));
-                model = glm::rotate(model, glm::radians(lamp.rotY), glm::vec3(0, 1, 0)); model = glm::translate(model, glm::vec3(0.0f, 0.0f, -0.25f)); model = glm::scale(model, glm::vec3(0.4f));
-                sceneShader->setMat4("model", model); if (lampModel) lampModel->Draw(*sceneShader);
+            // --- DIBUJAR LÁMPARAS ---
+            for (const Lamp& lamp : lamps)
+            {
+                glm::mat4 model = glm::mat4(1.0f);
+                model = glm::translate(model, lamp.pos + glm::vec3(0.0f, 0.75f, 0.0f));
+                model = glm::rotate(model, glm::radians(lamp.rotY), glm::vec3(0, 1, 0));
+                model = glm::translate(model, glm::vec3(0.0f, 0.0f, -0.25f));
+                model = glm::scale(model, glm::vec3(0.4f));
+                sceneShader->setMat4("model", model);
+                if (lampModel) lampModel->Draw(*sceneShader);
             }
 
-            // --- RENDERIZAR PROPS MÓVILES ---
-            for (const auto& prop : dynamicProps) {
-                if (!prop.isFinished && prop.isTriggered) { // Solo dibujar si está activo
+            // --- VARIABLES DE ANIMACIÓN (NUEVO) ---
+            float hoverOffset = sin(gameTime * 2.0f) * 0.1f; // Sube y baja 10cm
+            float rotationAngle = gameTime * 45.0f; // Gira 45 grados por segundo
+
+            // --- DIBUJAR ITEMS ---
+            if (!haveItem1) {
+                model = glm::mat4(1.0f);
+                // Posición base + Altura extra (0.5f) + Movimiento suave (hoverOffset)
+                model = glm::translate(model, item1Pos + glm::vec3(0.0f, 0.5f + hoverOffset, 0.0f));
+                // Rotación constante
+                model = glm::rotate(model, glm::radians(rotationAngle), glm::vec3(0.0f, 1.0f, 0.0f));
+                model = glm::scale(model, glm::vec3(0.1f));
+                sceneShader->setMat4("model", model);
+                if (itemModel) itemModel->Draw(*sceneShader);
+            }
+            if (!haveItem2) {
+                model = glm::mat4(1.0f);
+                model = glm::translate(model, item2Pos + glm::vec3(0.0f, 0.5f + hoverOffset, 0.0f));
+                model = glm::rotate(model, glm::radians(rotationAngle), glm::vec3(0.0f, 1.0f, 0.0f));
+                model = glm::scale(model, glm::vec3(0.1f));
+                sceneShader->setMat4("model", model);
+                if (itemModel) itemModel->Draw(*sceneShader);
+            }
+            if (!haveItem3) {
+                model = glm::mat4(1.0f);
+                model = glm::translate(model, item3Pos + glm::vec3(0.0f, 0.5f + hoverOffset, 0.0f));
+                model = glm::rotate(model, glm::radians(rotationAngle), glm::vec3(0.0f, 1.0f, 0.0f));
+                model = glm::scale(model, glm::vec3(0.1f));
+                sceneShader->setMat4("model", model);
+                if (itemModel) itemModel->Draw(*sceneShader);
+            }
+            if (!haveItem4) {
+                model = glm::mat4(1.0f);
+                model = glm::translate(model, item4Pos + glm::vec3(0.0f, 0.5f + hoverOffset, 0.0f));
+                model = glm::rotate(model, glm::radians(rotationAngle), glm::vec3(0.0f, 1.0f, 0.0f));
+                model = glm::scale(model, glm::vec3(0.1f));
+                sceneShader->setMat4("model", model);
+                if (itemModel) itemModel->Draw(*sceneShader);
+            }
+
+            // Ángel
+            if (!angelGone) {
+                if (flashlightOn || (angelEventActive && angelTimer < 1.2f)) {
                     model = glm::mat4(1.0f);
-                    model = glm::translate(model, prop.currentPos);
-
-                    float angle = atan2(prop.moveDir.x, prop.moveDir.z);
-                    model = glm::rotate(model, angle, glm::vec3(0, 1, 0));
-
-                    model = glm::scale(model, glm::vec3(0.005f)); // Ajusta escala si usas angel
-
+                    model = glm::translate(model, angelPos);
+                    model = glm::rotate(model, glm::radians(180.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+                    model = glm::scale(model, glm::vec3(3.0f));
                     sceneShader->setMat4("model", model);
                     if (angelModel) angelModel->Draw(*sceneShader);
                 }
             }
 
-            float hoverOffset = sin(gameTime * 2.0f) * 0.1f;
-            float rotationAngle = gameTime * 45.0f;
+            // --- RENDERIZAR PROPS MÓVILES (CORREGIDO PARA VISIBILIDAD) ---
+            for (const auto& prop : dynamicProps) {
+                // Dibujamos siempre que no haya terminado
+                if (!prop.isFinished) {
+                    model = glm::mat4(1.0f);
+                    model = glm::translate(model, prop.currentPos);
 
-            if (!haveItem1) { model = glm::mat4(1.0f); model = glm::translate(model, item1Pos + glm::vec3(0.0f, 0.5f + hoverOffset, 0.0f)); model = glm::rotate(model, glm::radians(rotationAngle), glm::vec3(0.0f, 1.0f, 0.0f)); model = glm::scale(model, glm::vec3(0.1f)); sceneShader->setMat4("model", model); if (itemModel) itemModel->Draw(*sceneShader); }
-            if (!haveItem2) { model = glm::mat4(1.0f); model = glm::translate(model, item2Pos + glm::vec3(0.0f, 0.5f + hoverOffset, 0.0f)); model = glm::rotate(model, glm::radians(rotationAngle), glm::vec3(0.0f, 1.0f, 0.0f)); model = glm::scale(model, glm::vec3(0.1f)); sceneShader->setMat4("model", model); if (itemModel) itemModel->Draw(*sceneShader); }
-            if (!haveItem3) { model = glm::mat4(1.0f); model = glm::translate(model, item3Pos + glm::vec3(0.0f, 0.5f + hoverOffset, 0.0f)); model = glm::rotate(model, glm::radians(rotationAngle), glm::vec3(0.0f, 1.0f, 0.0f)); model = glm::scale(model, glm::vec3(0.1f)); sceneShader->setMat4("model", model); if (itemModel) itemModel->Draw(*sceneShader); }
-            if (!haveItem4) { model = glm::mat4(1.0f); model = glm::translate(model, item4Pos + glm::vec3(0.0f, 0.5f + hoverOffset, 0.0f)); model = glm::rotate(model, glm::radians(rotationAngle), glm::vec3(0.0f, 1.0f, 0.0f)); model = glm::scale(model, glm::vec3(0.1f)); sceneShader->setMat4("model", model); if (itemModel) itemModel->Draw(*sceneShader); }
+                    float angle = atan2(prop.moveDir.x, prop.moveDir.z);
+                    model = glm::rotate(model, angle + glm::radians(prop.rotationOffset), glm::vec3(0, 1, 0));
 
-            if (!angelGone) {
-                if (flashlightOn || (angelEventActive && angelTimer < 1.2f)) {
-                    model = glm::mat4(1.0f); model = glm::translate(model, angelPos); model = glm::rotate(model, glm::radians(180.0f), glm::vec3(0.0f, 1.0f, 0.0f)); model = glm::scale(model, glm::vec3(3.0f));
-                    sceneShader->setMat4("model", model); if (angelModel) angelModel->Draw(*sceneShader);
+                    model = glm::scale(model, prop.scale);
+
+                    sceneShader->setMat4("model", model);
+
+                    // ELEGIR MODELO SEGÚN EL TIPO
+                    switch (prop.modelType) {
+                    case MODEL_ANGEL:
+                        if (angelModel) angelModel->Draw(*sceneShader);
+                        break;
+                    case MODEL_SCREAMER:
+                        if (screamerModel) screamerModel->Draw(*sceneShader);
+                        break;
+                    case MODEL_ITEM:
+                        if (itemModel) itemModel->Draw(*sceneShader);
+                        break;
+                    case MODEL_LAMP:
+                        if (lampModel) lampModel->Draw(*sceneShader);
+                        break;
+                    case MODEL_MUJER:
+                        if (mujerModel) mujerModel->Draw(*sceneShader);
+                        break;
+                    }
                 }
             }
 
+            // Screamer (SOLO si está jugando, no en pausa)
             if (gameState == JUGANDO && screamerTriggered && screamerTimer < SCREAMER_DURATION && screamerModel) {
-                model = glm::mat4(1.0f); glm::vec3 screamerPos = camera.Position + (camera.Front * screamerDistance); glm::vec3 cameraRight = glm::normalize(glm::cross(camera.Front, camera.Up)); glm::vec3 cameraUp = camera.Up; screamerPos += cameraRight * screamerOffset.x; screamerPos += cameraUp * screamerOffset.y; screamerPos += camera.Front * screamerOffset.z; model = glm::translate(model, screamerPos); glm::vec3 direction = glm::normalize(camera.Position - screamerPos); float angle = atan2(direction.x, direction.z); model = glm::rotate(model, angle, glm::vec3(0.0f, 1.0f, 0.0f)); model = glm::scale(model, glm::vec3(0.5f)); sceneShader->setMat4("model", model); screamerModel->Draw(*sceneShader);
+                model = glm::mat4(1.0f);
+                glm::vec3 screamerPos = camera.Position + (camera.Front * screamerDistance);
+                glm::vec3 cameraRight = glm::normalize(glm::cross(camera.Front, camera.Up));
+                glm::vec3 cameraUp = camera.Up;
+                screamerPos += cameraRight * screamerOffset.x;
+                screamerPos += cameraUp * screamerOffset.y;
+                screamerPos += camera.Front * screamerOffset.z;
+                model = glm::translate(model, screamerPos);
+                glm::vec3 direction = glm::normalize(camera.Position - screamerPos);
+                float angle = atan2(direction.x, direction.z);
+                model = glm::rotate(model, angle, glm::vec3(0.0f, 1.0f, 0.0f));
+                model = glm::scale(model, glm::vec3(0.5f));
+                sceneShader->setMat4("model", model);
+                screamerModel->Draw(*sceneShader);
             }
 
+            // Lluvia
             if (gameState == JUGANDO && rainEnabled && rainShader) {
-                glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); rainShader->use(); rainShader->setMat4("projection", projection); rainShader->setMat4("view", view); rainShader->setVec3("spotLightPos", camera.Position); rainShader->setVec3("spotLightDir", camera.Front); rainShader->setBool("flashlightOn", flashlightOn);
+                glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+                rainShader->use();
+                rainShader->setMat4("projection", projection); rainShader->setMat4("view", view);
+                rainShader->setVec3("spotLightPos", camera.Position); rainShader->setVec3("spotLightDir", camera.Front);
+                rainShader->setBool("flashlightOn", flashlightOn);
                 std::vector<float> rainVertices;
                 for (auto& drop : rainDrops) {
                     drop.position.y -= drop.speed * deltaTime;
                     if (drop.position.y < GROUND_HEIGHT) { drop.position.x = camera.Position.x + (rand() % 40) - 20.0f; drop.position.y = camera.Position.y + 15.0f + (rand() % 15); drop.position.z = camera.Position.z + (rand() % 40) - 20.0f; }
-                    glm::vec3 toCam = camera.Position - drop.position; toCam.y = 0; if (glm::length(toCam) > 25.0f) { drop.position = camera.Position + glm::vec3((rand() % 40) - 20, 15, (rand() % 40) - 20); }
-                    rainVertices.push_back(drop.position.x); rainVertices.push_back(drop.position.y); rainVertices.push_back(drop.position.z); rainVertices.push_back(drop.position.x); rainVertices.push_back(drop.position.y - 0.3f); rainVertices.push_back(drop.position.z);
+                    glm::vec3 toCam = camera.Position - drop.position; toCam.y = 0;
+                    if (glm::length(toCam) > 25.0f) { drop.position = camera.Position + glm::vec3((rand() % 40) - 20, 15, (rand() % 40) - 20); }
+                    rainVertices.push_back(drop.position.x); rainVertices.push_back(drop.position.y); rainVertices.push_back(drop.position.z);
+                    rainVertices.push_back(drop.position.x); rainVertices.push_back(drop.position.y - 0.3f); rainVertices.push_back(drop.position.z);
                 }
-                glBindVertexArray(rainVAO); glBindBuffer(GL_ARRAY_BUFFER, rainVBO); glBufferData(GL_ARRAY_BUFFER, rainVertices.size() * sizeof(float), rainVertices.data(), GL_DYNAMIC_DRAW); glEnableVertexAttribArray(0); glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0); glLineWidth(1.5f); glDrawArrays(GL_LINES, 0, rainDrops.size() * 2); glBindVertexArray(0); glDisable(GL_BLEND);
+                glBindVertexArray(rainVAO); glBindBuffer(GL_ARRAY_BUFFER, rainVBO);
+                glBufferData(GL_ARRAY_BUFFER, rainVertices.size() * sizeof(float), rainVertices.data(), GL_DYNAMIC_DRAW);
+                glEnableVertexAttribArray(0); glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+                glLineWidth(1.5f); glDrawArrays(GL_LINES, 0, rainDrops.size() * 2); glBindVertexArray(0); glDisable(GL_BLEND);
             }
 
-            glDepthFunc(GL_LEQUAL); skyboxShader->use(); view = glm::mat4(glm::mat3(camera.GetViewMatrix())); skyboxShader->setMat4("view", view); skyboxShader->setMat4("projection", projection); glBindVertexArray(skyboxVAO); glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture); glDrawArrays(GL_TRIANGLES, 0, 36); glBindVertexArray(0); glDepthFunc(GL_LESS);
+            // Skybox
+            glDepthFunc(GL_LEQUAL); skyboxShader->use();
+            view = glm::mat4(glm::mat3(camera.GetViewMatrix()));
+            skyboxShader->setMat4("view", view); skyboxShader->setMat4("projection", projection);
+            glBindVertexArray(skyboxVAO); glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
+            glDrawArrays(GL_TRIANGLES, 0, 36); glBindVertexArray(0); glDepthFunc(GL_LESS);
 
-            ImGui_ImplOpenGL3_NewFrame(); ImGui_ImplGlfw_NewFrame(); ImGui::NewFrame();
-            if (gameState == PAUSED) drawPauseScreen();
-            ImGui::Render(); ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+            // Dibujar pantalla de pausa si está en pausa
+            ImGui_ImplOpenGL3_NewFrame();
+            ImGui_ImplGlfw_NewFrame();
+            ImGui::NewFrame();
+
+            if (gameState == PAUSED)
+            {
+                drawPauseScreen();
+            }
+
+            ImGui::Render();
+            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         }
-        glfwSwapBuffers(window); glfwPollEvents();
+
+        glfwSwapBuffers(window);
+        glfwPollEvents();
     }
 
-    ImGui_ImplOpenGL3_Shutdown(); ImGui_ImplGlfw_Shutdown(); ImGui::DestroyContext(); glfwTerminate();
-    if (environment) delete environment; if (angelModel) delete angelModel; if (itemModel) delete itemModel; if (lampModel) delete lampModel; if (screamerModel) delete screamerModel; if (rainShader) delete rainShader; if (sceneShader) delete sceneShader; if (skyboxShader) delete skyboxShader;
-    Mix_FreeChunk(flashlightSound); Mix_FreeChunk(footstepSound); Mix_FreeChunk(screamerSound); Mix_FreeChunk(rainSound); Mix_FreeMusic(gameAmbientMusic); Mix_FreeMusic(menuMusic); glDeleteVertexArrays(1, &rainVAO); glDeleteBuffers(1, &rainVBO); glDeleteVertexArrays(1, &skyboxVAO); glDeleteBuffers(1, &skyboxVBO); Mix_CloseAudio(); SDL_Quit();
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
+    glfwTerminate();
+
+    // Limpieza
+    if (environment) delete environment;
+    if (angelModel) delete angelModel;
+    if (itemModel) delete itemModel;
+    if (lampModel) delete lampModel;
+    if (mujerModel) delete mujerModel;
+    if (screamerModel) delete screamerModel;
+    if (rainShader) delete rainShader;
+    if (sceneShader) delete sceneShader;
+    if (skyboxShader) delete skyboxShader;
+
+    Mix_FreeChunk(flashlightSound);
+    Mix_FreeChunk(footstepSound);
+    Mix_FreeChunk(screamerSound);
+    Mix_FreeChunk(rainSound);
+    Mix_FreeMusic(gameAmbientMusic);
+    Mix_FreeMusic(menuMusic);
+    glDeleteVertexArrays(1, &rainVAO);
+    glDeleteBuffers(1, &rainVBO);
+    glDeleteVertexArrays(1, &skyboxVAO);
+    glDeleteBuffers(1, &skyboxVBO);
+    Mix_CloseAudio();
+    SDL_Quit();
+
     return 0;
 }
 
+// Callbacks y Input
 void processInput(GLFWwindow* window)
 {
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) { gameState = PAUSED; Mix_PauseMusic(); if (rainSoundChannel != -1) Mix_Pause(rainSoundChannel); }
-    glm::vec3 currentPos = camera.Position; glm::vec3 nextPos = currentPos; glm::vec3 forward = camera.Front; forward.y = 0.0f; forward = glm::normalize(forward); glm::vec3 right = glm::normalize(glm::cross(forward, camera.Up)); float velocity = camera.MovementSpeed * deltaTime;
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) nextPos += forward * velocity; if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) nextPos -= forward * velocity; if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) nextPos -= right * velocity; if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) nextPos += right * velocity; nextPos.y = GROUND_HEIGHT + EYE_HEIGHT;
-    if (isWalkable(nextPos)) { camera.Position = nextPos; isMoving = glm::distance(nextPos, currentPos) > 0.0001f; }
-    else { isMoving = false; }
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+    {
+        gameState = PAUSED;
+        Mix_PauseMusic();
+        if (rainSoundChannel != -1)
+        {
+            Mix_Pause(rainSoundChannel);
+        }
+    }
+
+    glm::vec3 currentPos = camera.Position; glm::vec3 nextPos = currentPos;
+    glm::vec3 forward = camera.Front; forward.y = 0.0f; forward = glm::normalize(forward);
+    glm::vec3 right = glm::normalize(glm::cross(forward, camera.Up));
+    float velocity = camera.MovementSpeed * deltaTime;
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) nextPos += forward * velocity;
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) nextPos -= forward * velocity;
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) nextPos -= right * velocity;
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) nextPos += right * velocity;
+    nextPos.y = GROUND_HEIGHT + EYE_HEIGHT;
+    //if (isWalkable(nextPos)) { 
+    camera.Position = nextPos;
+    isMoving = glm::distance(nextPos, currentPos) > 0.0001f;
+    /*}
+    else {
+        isMoving = false;
+    }*/
     if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS) std::cout << "Pos: " << nextPos.x << ", " << nextPos.y << ", " << nextPos.z << std::endl;
-    static bool rPress = false; if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS && !rPress) { rainEnabled = !rainEnabled; rPress = true; if (rainEnabled) { if (rainSoundChannel == -1) rainSoundChannel = Mix_PlayChannel(-1, rainSound, -1); } else { Mix_HaltChannel(rainSoundChannel); rainSoundChannel = -1; } } if (glfwGetKey(window, GLFW_KEY_R) == GLFW_RELEASE) rPress = false;
+    static bool rPress = false;
+    if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS && !rPress) { rainEnabled = !rainEnabled; rPress = true; if (rainEnabled) { if (rainSoundChannel == -1) rainSoundChannel = Mix_PlayChannel(-1, rainSound, -1); } else { Mix_HaltChannel(rainSoundChannel); rainSoundChannel = -1; } }
+    if (glfwGetKey(window, GLFW_KEY_R) == GLFW_RELEASE) rPress = false;
 }
+
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) { glViewport(0, 0, width, height); }
-void mouse_callback(GLFWwindow* window, double xpos, double ypos) { if (gameState != JUGANDO) return; if (firstMouse) { lastX = xpos; lastY = ypos; firstMouse = false; } float xoffset = xpos - lastX; float yoffset = lastY - ypos; lastX = xpos; lastY = ypos; camera.ProcessMouseMovement(xoffset, yoffset); }
-void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) { if (gameState == JUGANDO) camera.ProcessMouseScroll(yoffset); }
-void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) { if (gameState == JUGANDO && button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) { if (!angelEventActive) { flashlightOn = !flashlightOn; if (flashlightSound) Mix_PlayChannel(-1, flashlightSound, 0); } } }
-unsigned int loadCubemap(std::vector<std::string> faces) { unsigned int textureID; glGenTextures(1, &textureID); glBindTexture(GL_TEXTURE_CUBE_MAP, textureID); int width, height, nrChannels; for (unsigned int i = 0; i < faces.size(); i++) { unsigned char* data = stbi_load(faces[i].c_str(), &width, &height, &nrChannels, 0); if (data) { glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data); stbi_image_free(data); } else { std::cout << "Cubemap failed: " << faces[i] << std::endl; stbi_image_free(data); } } glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR); glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR); glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE); return textureID; }
+
+void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
+    if (gameState != JUGANDO) return;
+    if (firstMouse) { lastX = xpos; lastY = ypos; firstMouse = false; }
+    float xoffset = xpos - lastX; float yoffset = lastY - ypos;
+    lastX = xpos; lastY = ypos;
+    camera.ProcessMouseMovement(xoffset, yoffset);
+}
+
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
+    if (gameState == JUGANDO) camera.ProcessMouseScroll(yoffset);
+}
+
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
+    if (gameState == JUGANDO && button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+        if (!angelEventActive) {
+            flashlightOn = !flashlightOn;
+            if (flashlightSound) Mix_PlayChannel(-1, flashlightSound, 0);
+        }
+    }
+}
+
+unsigned int loadCubemap(std::vector<std::string> faces) {
+    unsigned int textureID;
+    glGenTextures(1, &textureID);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
+    int width, height, nrChannels;
+    for (unsigned int i = 0; i < faces.size(); i++) {
+        unsigned char* data = stbi_load(faces[i].c_str(), &width, &height, &nrChannels, 0);
+        if (data) {
+            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+            stbi_image_free(data);
+        }
+        else {
+            std::cout << "Cubemap failed: " << faces[i] << std::endl;
+            stbi_image_free(data);
+        }
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    return textureID;
+}
