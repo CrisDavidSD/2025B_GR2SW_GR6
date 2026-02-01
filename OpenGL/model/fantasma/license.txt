@@ -1,0 +1,11 @@
+Model Information:
+* title:	Iron Spectre
+* source:	https://sketchfab.com/3d-models/iron-spectre-b57a8ecb11e44dc18d82685597558dc8
+* author:	Smallpoly (https://sketchfab.com/smallpoly)
+
+Model License:
+* license type:	CC-BY-NC-4.0 (http://creativecommons.org/licenses/by-nc/4.0/)
+* requirements:	Author must be credited. No commercial use.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Iron Spectre" (https://sketchfab.com/3d-models/iron-spectre-b57a8ecb11e44dc18d82685597558dc8) by Smallpoly (https://sketchfab.com/smallpoly) licensed under CC-BY-NC-4.0 (http://creativecommons.org/licenses/by-nc/4.0/)
