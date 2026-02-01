@@ -1,0 +1,11 @@
+Model Information:
+* title:	GD52_MOD1_A3_SaigeBaker
+* source:	https://sketchfab.com/3d-models/gd52-mod1-a3-saigebaker-bf198fbc69ce42a599ef800598c83910
+* author:	TheArtGun (https://sketchfab.com/theartgun)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "GD52_MOD1_A3_SaigeBaker" (https://sketchfab.com/3d-models/gd52-mod1-a3-saigebaker-bf198fbc69ce42a599ef800598c83910) by TheArtGun (https://sketchfab.com/theartgun) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
