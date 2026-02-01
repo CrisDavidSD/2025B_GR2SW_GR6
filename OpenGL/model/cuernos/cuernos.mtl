@@ -1,0 +1,51 @@
+# Blender MTL File: 'None'
+# Material Count: 4
+
+newmtl Arms
+Ns 421.861106
+Ka 0.667727 0.667727 0.667727
+Kd 0.800000 0.800000 0.800000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 3
+map_Bump Arms_normal.png
+map_Kd Arms_baseColor.png
+
+newmtl Head
+Ns 701.861369
+Ka 1.000000 1.000000 1.000000
+Kd 0.800000 0.800000 0.800000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Bump Head_normal.png
+map_Kd Head_baseColor.png
+
+newmtl Torso
+Ns 548.493554
+Ka 0.582705 0.582705 0.582705
+Kd 0.800000 0.800000 0.800000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 3
+map_Bump Torso_normal.png
+map_Kd Torso_baseColor.png
+
+newmtl flor
+Ns 56.568545
+Ka 1.000000 1.000000 1.000000
+Kd 0.800000 0.800000 0.800000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Bump flor_normal.png
+map_Kd flor_baseColor.png
+map_d flor_baseColor.png
