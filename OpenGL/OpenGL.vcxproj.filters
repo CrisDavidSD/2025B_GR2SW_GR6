@@ -25,9 +25,6 @@
     <Filter Include="imgui">
       <UniqueIdentifier>{ee01a1af-e8be-4cd9-8292-85321f7b93eb}</UniqueIdentifier>
     </Filter>
-    <Filter Include="imgui\backends">
-      <UniqueIdentifier>{b603680d-c419-4865-807a-2ee63805e359}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\OpenGL_Stuff\Library\glad.c">
@@ -42,17 +39,17 @@
     <ClCompile Include="imgui\imgui_draw.cpp">
       <Filter>imgui</Filter>
     </ClCompile>
+    <ClCompile Include="imgui\imgui_impl_glfw.cpp">
+      <Filter>imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="imgui\imgui_impl_opengl3.cpp">
+      <Filter>imgui</Filter>
+    </ClCompile>
     <ClCompile Include="imgui\imgui_tables.cpp">
       <Filter>imgui</Filter>
     </ClCompile>
     <ClCompile Include="imgui\imgui_widgets.cpp">
       <Filter>imgui</Filter>
-    </ClCompile>
-    <ClCompile Include="imgui\backends\imgui_impl_glfw.cpp">
-      <Filter>imgui\backends</Filter>
-    </ClCompile>
-    <ClCompile Include="imgui\backends\imgui_impl_opengl3.cpp">
-      <Filter>imgui\backends</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -88,6 +85,15 @@
     <ClInclude Include="imgui\imgui.h">
       <Filter>imgui</Filter>
     </ClInclude>
+    <ClInclude Include="imgui\imgui_impl_glfw.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="imgui\imgui_impl_opengl3.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="imgui\imgui_impl_opengl3_loader.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
     <ClInclude Include="imgui\imgui_internal.h">
       <Filter>imgui</Filter>
     </ClInclude>
@@ -99,15 +105,6 @@
     </ClInclude>
     <ClInclude Include="imgui\imstb_truetype.h">
       <Filter>imgui</Filter>
-    </ClInclude>
-    <ClInclude Include="imgui\backends\imgui_impl_glfw.h">
-      <Filter>imgui\backends</Filter>
-    </ClInclude>
-    <ClInclude Include="imgui\backends\imgui_impl_opengl3.h">
-      <Filter>imgui\backends</Filter>
-    </ClInclude>
-    <ClInclude Include="imgui\backends\imgui_impl_opengl3_loader.h">
-      <Filter>imgui\backends</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
