@@ -11,10 +11,14 @@
 
 #include <iostream>
 #include <vector>
-#include <string> 
+#include <string>
 #include <windows.h>
 #include <cstdlib>
 #include <ctime>
+
+#include "imgui/imgui.h"
+#include "imgui/imgui_impl_glfw.h"
+#include "imgui/imgui_impl_opengl3.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <learnopengl/stb_image.h>
@@ -50,7 +54,8 @@ int itemsCollected = 0;
 // Audio
 Mix_Chunk* flashlightSound = nullptr;
 Mix_Chunk* footstepSound = nullptr;
-Mix_Music* ambientMusic = nullptr;
+Mix_Music* gameAmbientMusic = nullptr;
+Mix_Music* menuMusic = nullptr;
 Mix_Chunk* screamerSound = nullptr;
 Mix_Chunk* rainSound = nullptr;
 int rainSoundChannel = -1;
@@ -122,11 +127,11 @@ bool firstMouse = true;
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
-// --- VARIABLES DE GAMEPLAy ---
+// --- VARIABLES DE GAMEPLAY ---
 glm::vec3 item1Pos = glm::vec3(2.05819f, -2.0f, -6.94706f);
 glm::vec3 item2Pos = glm::vec3(22.569f, -2.0f, -17.1857f);
-glm::vec3 item3Pos = glm::vec3(-6.8024f, -2.0f, -34.2286f); 
-glm::vec3 item4Pos = glm::vec3(-42.11f, -2.0f, -17.943f); 
+glm::vec3 item3Pos = glm::vec3(-6.8024f, -2.0f, -34.2286f);
+glm::vec3 item4Pos = glm::vec3(-42.11f, -2.0f, -17.943f);
 
 bool haveItem1 = false;
 bool haveItem2 = false;
@@ -194,52 +199,365 @@ bool isWalkable(glm::vec3 nextPos) {
     return false;
 }
 
-int main()
+// --- ENUM Y VARIABLES DE ESTADO DEL JUEGO ---
+enum GameState {
+    LOADING,
+    MENU,
+    CONTROLES_MENU,
+    JUGANDO,
+    PAUSED
+};
+
+GameState gameState = LOADING;
+bool showMenu = true;
+float loadingProgress = 0.0f;
+float loadingDotTimer = 0.0f;
+int loadingDotCount = 1;
+
+// Variable global para la ventana
+GLFWwindow* gWindow = nullptr;
+
+// Modelos globales
+Model* environment = nullptr;
+Model* itemModel = nullptr;
+Model* lampModel = nullptr;
+Shader* sceneShader = nullptr;
+Shader* skyboxShader = nullptr;
+unsigned int skyboxVAO = 0, skyboxVBO = 0;
+unsigned int cubemapTexture = 0;
+glm::vec3 fogColorVector = glm::vec3(0.05f, 0.05f, 0.05f);
+
+// --- FUNCIONES DE INTERFAZ ---
+void drawLoadingScreen()
 {
-    glfwInit();
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    ImGui::SetNextWindowPos(ImVec2(0, 0));
+    ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
 
-    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "ProyectoFinal", NULL, NULL);
-    if (window == NULL)
+    ImGui::Begin("Loading", nullptr,
+        ImGuiWindowFlags_NoDecoration |
+        ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoResize);
+
+    float windowHeight = ImGui::GetIO().DisplaySize.y;
+    float windowWidth = ImGui::GetIO().DisplaySize.x;
+
+    // Fondo negro
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    draw_list->AddRectFilled(ImVec2(0, 0), ImGui::GetIO().DisplaySize, ImGui::GetColorU32(ImVec4(0.0f, 0.0f, 0.0f, 1.0f)));
+
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f)); // Blanco
+
+    // Calcular texto con puntos animados
+    loadingDotTimer += deltaTime;
+    if (loadingDotTimer >= 0.5f)
     {
-        std::cout << "Failed to create GLFW window" << std::endl;
-        glfwTerminate();
-        return -1;
+        loadingDotCount++;
+        if (loadingDotCount > 3) loadingDotCount = 1;
+        loadingDotTimer = 0.0f;
     }
-    glfwMakeContextCurrent(window);
-    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-    glfwSetCursorPosCallback(window, mouse_callback);
-    glfwSetScrollCallback(window, scroll_callback);
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    glfwSetMouseButtonCallback(window, mouse_button_callback);
 
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    std::string loadingText = "CARGANDO";
+    for (int i = 0; i < loadingDotCount; i++)
+        loadingText += ".";
+
+    // Centrar texto
+    ImGui::SetCursorPosY(windowHeight * 0.45f);
+    ImGui::SetWindowFontScale(3.0f);
+    ImVec2 textSize = ImGui::CalcTextSize(loadingText.c_str());
+    ImGui::SetCursorPosX((windowWidth - textSize.x) * 0.5f);
+    ImGui::Text(loadingText.c_str());
+    ImGui::SetWindowFontScale(1.0f);
+
+    ImGui::PopStyleColor();
+
+    ImGui::End();
+}
+
+void drawMenuScreen()
+{
+    ImGui::SetNextWindowPos(ImVec2(0, 0));
+    ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
+
+    ImGui::Begin("MenuPrincipal", nullptr,
+        ImGuiWindowFlags_NoDecoration |
+        ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoBringToFrontOnFocus);
+
+    float windowHeight = ImGui::GetIO().DisplaySize.y;
+    float windowWidth = ImGui::GetIO().DisplaySize.x;
+
+    // Fondo negro con sombras
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    draw_list->AddRectFilled(ImVec2(0, 0), ImGui::GetIO().DisplaySize, ImGui::GetColorU32(ImVec4(0.05f, 0.05f, 0.05f, 1.0f)));
+
+    // Estilo terror - colores oscuros y grises
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 0.9f, 0.9f, 1.0f)); // Gris claro
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.15f, 0.15f, 0.15f, 1.0f)); // Gris muy oscuro
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 1.0f)); // Gris oscuro al pasar
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.4f, 0.4f, 0.4f, 1.0f)); // Gris al clickear
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(windowWidth * 0.02f, windowHeight * 0.03f));
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 5.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, windowHeight * 0.04f));
+
+    float buttonWidth = windowWidth * 0.25f;
+    float buttonHeight = windowHeight * 0.08f;
+
+    // Título centrado
+    ImGui::SetWindowFontScale(4.0f);
+    ImVec2 titleSize = ImGui::CalcTextSize("PROYECTO FINAL");
+    ImGui::SetCursorPosY(windowHeight * 0.15f);
+    ImGui::SetCursorPosX((windowWidth - titleSize.x) * 0.5f);
+    ImGui::Text("PROYECTO FINAL");
+    ImGui::SetWindowFontScale(1.0f);
+
+    // Espacio antes de botones
+    ImGui::SetCursorPosY(windowHeight * 0.35f);
+
+    // Botón JUGAR centrado
+    ImGui::SetWindowFontScale(2.0f);
+    ImGui::SetCursorPosX((windowWidth - buttonWidth) * 0.5f);
+    if (ImGui::Button("JUGAR", ImVec2(buttonWidth, buttonHeight)))
     {
-        std::cout << "Failed to initialize GLAD" << std::endl;
-        return -1;
+        gameState = JUGANDO;
+        showMenu = false;
+        glfwSetInputMode(gWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        firstMouse = true;
+
+        // Detener música del menú
+        if (menuMusic)
+        {
+            Mix_HaltMusic();
+        }
+
+        // Iniciar sonidos del juego
+        if (gameAmbientMusic)
+        {
+            Mix_VolumeMusic(ambientBaseVolume);
+            Mix_PlayMusic(gameAmbientMusic, -1);
+        }
+
+        // Reproducir lluvia
+        if (rainEnabled && rainSound && rainSoundChannel == -1)
+        {
+            rainSoundChannel = Mix_PlayChannel(-1, rainSound, -1);
+            Mix_Volume(rainSoundChannel, 30);
+        }
+
+        gameTime = 0.0f;
+        screamerTriggered = false;
     }
 
-    glEnable(GL_DEPTH_TEST);
+    // Botón CONTROLES centrado
+    ImGui::SetCursorPosX((windowWidth - buttonWidth) * 0.5f);
+    if (ImGui::Button("CONTROLES", ImVec2(buttonWidth, buttonHeight)))
+    {
+        gameState = CONTROLES_MENU;
+    }
 
-    Shader sceneShader("shaders/scene.vs", "shaders/scene.fs");
-    Shader skyboxShader("shaders/skybox.vs", "shaders/skybox.fs");
-    rainShader = new Shader("shaders/rain.vs", "shaders/rain.fs");
+    // Botón SALIR centrado
+    ImGui::SetCursorPosX((windowWidth - buttonWidth) * 0.5f);
+    if (ImGui::Button("SALIR", ImVec2(buttonWidth, buttonHeight)))
+    {
+        glfwSetWindowShouldClose(gWindow, true);
+    }
+    ImGui::SetWindowFontScale(1.0f);
 
-    stbi_set_flip_vertically_on_load(false);
+    ImGui::PopStyleVar(3);
+    ImGui::PopStyleColor(4);
 
+    ImGui::End();
+}
+
+void drawControlsScreen()
+{
+    ImGui::SetNextWindowPos(ImVec2(0, 0));
+    ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
+
+    ImGui::Begin("ControlsScreen", nullptr,
+        ImGuiWindowFlags_NoDecoration |
+        ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoBringToFrontOnFocus);
+
+    float windowHeight = ImGui::GetIO().DisplaySize.y;
+    float windowWidth = ImGui::GetIO().DisplaySize.x;
+
+    // Fondo negro con sombras
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    draw_list->AddRectFilled(ImVec2(0, 0), ImGui::GetIO().DisplaySize, ImGui::GetColorU32(ImVec4(0.05f, 0.05f, 0.05f, 1.0f)));
+
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 0.9f, 0.9f, 1.0f)); // Gris claro
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.15f, 0.15f, 0.15f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
+
+    // Título centrado
+    ImGui::SetWindowFontScale(3.5f);
+    ImVec2 titleSize = ImGui::CalcTextSize("CONTROLES DEL JUEGO");
+    ImGui::SetCursorPosY(windowHeight * 0.05f);
+    ImGui::SetCursorPosX((windowWidth - titleSize.x) * 0.5f);
+    ImGui::Text("CONTROLES DEL JUEGO");
+    ImGui::SetWindowFontScale(1.0f);
+
+    // Contenido de controles centrado
+    ImGui::SetCursorPosY(windowHeight * 0.2f);
+    ImGui::SetWindowFontScale(1.8f);
+
+    ImVec2 controlsSize = ImGui::CalcTextSize("W - Avanzar");
+    float controlsStartX = (windowWidth - controlsSize.x) * 0.5f;
+    ImGui::SetCursorPosX(controlsStartX);
+
+    ImGui::Text("W - Avanzar");
+    ImGui::SetCursorPosX(controlsStartX);
+    ImGui::Text("S - Retroceder");
+    ImGui::SetCursorPosX(controlsStartX);
+    ImGui::Text("A - Izquierda");
+    ImGui::SetCursorPosX(controlsStartX);
+    ImGui::Text("D - Derecha");
+    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + windowHeight * 0.02f);
+    ImGui::SetCursorPosX(controlsStartX);
+    ImGui::Text("RATON - Mirar alrededor");
+    ImGui::SetCursorPosX(controlsStartX);
+    ImGui::Text("BOTON IZQUIERDO RATON - Prender/Apagar linterna");
+    ImGui::SetCursorPosX(controlsStartX);
+    ImGui::Text("R - Activar/Desactivar lluvia");
+    ImGui::SetCursorPosX(controlsStartX);
+    ImGui::Text("P - Ver posicion actual");
+    ImGui::SetCursorPosX(controlsStartX);
+    ImGui::Text("ESC - Pausa/Salir del juego");
+    ImGui::SetWindowFontScale(1.0f);
+
+    // Botón VOLVER centrado
+    ImGui::SetCursorPosY(windowHeight * 0.85f);
+    ImGui::SetWindowFontScale(2.0f);
+    float buttonWidth = windowWidth * 0.2f;
+    float buttonHeight = windowHeight * 0.08f;
+    ImGui::SetCursorPosX((windowWidth - buttonWidth) * 0.5f);
+    if (ImGui::Button("VOLVER", ImVec2(buttonWidth, buttonHeight)))
+    {
+        gameState = MENU;
+    }
+    ImGui::SetWindowFontScale(1.0f);
+
+    ImGui::PopStyleColor(3);
+
+    ImGui::End();
+}
+
+void drawPauseScreen()
+{
+    ImGui::SetNextWindowPos(ImVec2(0, 0));
+    ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
+
+    ImGui::Begin("PauseScreen", nullptr,
+        ImGuiWindowFlags_NoDecoration |
+        ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoResize);
+
+    float windowHeight = ImGui::GetIO().DisplaySize.y;
+    float windowWidth = ImGui::GetIO().DisplaySize.x;
+
+    // Fondo oscuro semi-transparente
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    draw_list->AddRectFilled(ImVec2(0, 0), ImGui::GetIO().DisplaySize, ImGui::GetColorU32(ImVec4(0.0f, 0.0f, 0.0f, 0.8f)));
+
+    // Activar cursor en pausa
+    glfwSetInputMode(gWindow, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 0.9f, 0.9f, 1.0f)); // Gris claro
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.15f, 0.15f, 0.15f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
+
+    float buttonWidth = windowWidth * 0.25f;
+    float buttonHeight = windowHeight * 0.08f;
+
+    // Título centrado
+    ImGui::SetWindowFontScale(4.0f);
+    ImVec2 titleSize = ImGui::CalcTextSize("EN PAUSA");
+    ImGui::SetCursorPosY(windowHeight * 0.3f);
+    ImGui::SetCursorPosX((windowWidth - titleSize.x) * 0.5f);
+    ImGui::Text("EN PAUSA");
+    ImGui::SetWindowFontScale(1.0f);
+
+    // Botón REANUDAR centrado
+    ImGui::SetCursorPosY(windowHeight * 0.5f);
+    ImGui::SetCursorPosX((windowWidth - buttonWidth) * 0.5f);
+    ImGui::SetWindowFontScale(2.0f);
+    if (ImGui::Button("REANUDAR", ImVec2(buttonWidth, buttonHeight)))
+    {
+        gameState = JUGANDO;
+        Mix_ResumeMusic();
+        if (rainSoundChannel != -1)
+        {
+            Mix_Resume(rainSoundChannel);
+        }
+        glfwSetInputMode(gWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    }
+
+    // Botón SALIR AL MENU centrado
+    ImGui::SetCursorPosY(windowHeight * 0.65f);
+    ImGui::SetCursorPosX((windowWidth - buttonWidth) * 0.5f);
+    if (ImGui::Button("SALIR AL MENU", ImVec2(buttonWidth, buttonHeight)))
+    {
+        gameState = MENU;
+
+        // Detener audio del juego
+        if (gameAmbientMusic)
+        {
+            Mix_HaltMusic();
+        }
+        if (rainSoundChannel != -1)
+        {
+            Mix_HaltChannel(rainSoundChannel);
+            rainSoundChannel = -1;
+        }
+
+        // Reiniciar variables del juego
+        gameTime = 0.0f;
+        screamerTriggered = false;
+        flashlightOn = true;
+        haveItem1 = false;
+        haveItem2 = false;
+        haveItem3 = false;
+        haveItem4 = false;
+        itemsCollected = 0;
+        angelGone = false;
+        angelEventActive = false;
+
+        // Mantener cursor visible para el menú
+        glfwSetInputMode(gWindow, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+
+        // Reproducir música del menú
+        if (menuMusic && Mix_PlayingMusic() == 0)
+        {
+            Mix_PlayMusic(menuMusic, -1);
+        }
+    }
+    ImGui::SetWindowFontScale(1.0f);
+
+    ImGui::PopStyleColor(3);
+
+    ImGui::End();
+}
+
+void loadResources()
+{
     // Cargar Modelos
-    Model environment("model/Pasillo/Pasillos.gltf");
+    loadingProgress = 0.2f;
+    environment = new Model("model/Pasillo/Pasillos.gltf");
+
+    loadingProgress = 0.35f;
     angelModel = new Model("model/angelMuerte/angelMuerte.obj");
 
-    // Modelos para items y lámparas
-    Model itemModel("model/farola/farola.obj");
-    Model lampModel("model/lampara1/lampara1.obj");
+    loadingProgress = 0.5f;
+    itemModel = new Model("model/farola/farola.obj");
+    lampModel = new Model("model/lampara1/lampara1.obj");
 
+    loadingProgress = 0.65f;
     screamerModel = new Model("model/bebeTerror/bebeTerror.obj");
 
     // Inicializar Lluvia
+    loadingProgress = 0.75f;
     srand(time(NULL));
     for (int i = 0; i < MAX_RAIN_DROPS; i++) {
         RainDrop drop;
@@ -252,6 +570,7 @@ int main()
     glGenBuffers(1, &rainVBO);
 
     // Skybox Setup
+    loadingProgress = 0.9f;
     float skyboxVertices[] = {
         -10.0f,  10.0f, -10.0f, -10.0f, -10.0f, -10.0f,  10.0f, -10.0f, -10.0f,
          10.0f, -10.0f, -10.0f,  10.0f,  10.0f, -10.0f, -10.0f,  10.0f, -10.0f,
@@ -266,7 +585,6 @@ int main()
         -10.0f, -10.0f, -10.0f, -10.0f, -10.0f,  10.0f,  10.0f, -10.0f, -10.0f,
          10.0f, -10.0f, -10.0f, -10.0f, -10.0f,  10.0f,  10.0f, -10.0f,  10.0f
     };
-    unsigned int skyboxVAO, skyboxVBO;
     glGenVertexArrays(1, &skyboxVAO);
     glGenBuffers(1, &skyboxVBO);
     glBindVertexArray(skyboxVAO);
@@ -280,49 +598,178 @@ int main()
         "textures/skybox/top.png",   "textures/skybox/bottom.png",
         "textures/skybox/front.png", "textures/skybox/back.png"
     };
-    unsigned int cubemapTexture = loadCubemap(faces);
+    cubemapTexture = loadCubemap(faces);
 
-    skyboxShader.use();
-    skyboxShader.setInt("skybox", 0);
+    skyboxShader->use();
+    skyboxShader->setInt("skybox", 0);
 
-    glm::vec3 fogColorVector = glm::vec3(0.05f, 0.05f, 0.05f);
+    loadingProgress = 1.0f;
+}
 
-    SDL_Init(SDL_INIT_AUDIO);
-    Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048);
-    flashlightSound = Mix_LoadWAV("audio/flashlight_click.wav");
-    footstepSound = Mix_LoadWAV("audio/footstep.wav");
-    screamerSound = Mix_LoadWAV("audio/scream.wav");
-    rainSound = Mix_LoadWAV("audio/rain.wav");
-    ambientMusic = Mix_LoadMUS("audio/ambient.wav");
+int main()
+{
+    glfwInit();
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    if (ambientMusic) { Mix_VolumeMusic(ambientBaseVolume); Mix_PlayMusic(ambientMusic, -1); }
-    if (rainSound) { rainSoundChannel = Mix_PlayChannel(-1, rainSound, -1); Mix_Volume(rainSoundChannel, 30); }
+    // Crear ventana en pantalla completa
+    GLFWmonitor* primaryMonitor = glfwGetPrimaryMonitor();
+    const GLFWvidmode* mode = glfwGetVideoMode(primaryMonitor);
+    GLFWwindow* window = glfwCreateWindow(mode->width, mode->height, "ProyectoFinal", primaryMonitor, NULL);
 
+    if (window == NULL)
+    {
+        std::cout << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+
+    gWindow = window;
+    glfwMakeContextCurrent(window);
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+    glfwSetCursorPosCallback(window, mouse_callback);
+    glfwSetScrollCallback(window, scroll_callback);
+    glfwSetMouseButtonCallback(window, mouse_button_callback);
+
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cout << "Failed to initialize GLAD" << std::endl;
+        return -1;
+    }
+
+    glEnable(GL_DEPTH_TEST);
+
+    // ===== IMGUI INIT =====
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    ImGui::StyleColorsDark();
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init("#version 330");
+    glfwSetInputMode(gWindow, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+
+    // Crear shaders
+    sceneShader = new Shader("shaders/scene.vs", "shaders/scene.fs");
+    skyboxShader = new Shader("shaders/skybox.vs", "shaders/skybox.fs");
+    rainShader = new Shader("shaders/rain.vs", "shaders/rain.fs");
+
+    stbi_set_flip_vertically_on_load(false);
+
+    // ===== PANTALLA DE CARGA =====
+    while (gameState == LOADING)
+    {
+        glfwPollEvents();
+
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+
+        glClearColor(0.0f, 0.0f, 0.0f, 1);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        drawLoadingScreen();
+
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        glfwSwapBuffers(window);
+
+        // ⏳ Cargar recursos
+        loadResources();
+
+        // Inicializar audio
+        if (SDL_Init(SDL_INIT_AUDIO) < 0)
+        {
+            std::cout << "Error SDL_AUDIO\n";
+        }
+
+        if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0)
+        {
+            std::cout << "Error SDL_mixer\n";
+        }
+
+        // Cargar sonidos
+        flashlightSound = Mix_LoadWAV("audio/flashlight_click.wav");
+        footstepSound = Mix_LoadWAV("audio/footstep.wav");
+        screamerSound = Mix_LoadWAV("audio/scream.wav");
+        rainSound = Mix_LoadWAV("audio/rain.wav");
+        gameAmbientMusic = Mix_LoadMUS("audio/ambient.wav");
+        menuMusic = Mix_LoadMUS("audio/menu_music.wav");
+
+        if (!menuMusic)
+        {
+            std::cout << "Advertencia: Música del menú no encontrada\n";
+        }
+
+        // Cambiar a menú
+        gameState = MENU;
+    }
+
+    // ===== PANTALLA DE MENÚ =====
+    while ((gameState == MENU || gameState == CONTROLES_MENU) && !glfwWindowShouldClose(window))
+    {
+        glfwPollEvents();
+
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+
+        glClearColor(0.05f, 0.05f, 0.05f, 1);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        // Reproducir música del menú
+        if (menuMusic && Mix_PlayingMusic() == 0)
+        {
+            Mix_PlayMusic(menuMusic, -1);
+        }
+
+        if (gameState == MENU)
+        {
+            drawMenuScreen();
+        }
+        else if (gameState == CONTROLES_MENU)
+        {
+            drawControlsScreen();
+        }
+
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        glfwSwapBuffers(window);
+    }
+
+    // ===== GAME LOOP =====
     while (!glfwWindowShouldClose(window))
     {
         float currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
 
-        processInput(window);
-        gameTime += deltaTime;
+        if (gameState == JUGANDO) {
+            processInput(window);
+        }
+
+        // Actualizar tiempo de juego (SOLO si no está en pausa)
+        if (gameState == JUGANDO)
+        {
+            gameTime += deltaTime;
+        }
 
         // Calcular Flicker (Parpadeo) de las lámparas
         float flicker = 0.6f + 0.4f * sin(glfwGetTime() * 5.0f) + 0.2f * sin(glfwGetTime() * 14.0f);
 
         // --- LÓGICA DEL ÁNGEL ---
-        if (!angelGone && !angelEventActive) {
+        if (gameState == JUGANDO && !angelGone && !angelEventActive) {
             float dist = glm::distance(camera.Position, angelTriggerPos);
             if (dist < 5.0f) {
                 angelEventActive = true;
                 angelTimer = 0.0f;
             }
         }
-        if (angelEventActive) {
+        if (gameState == JUGANDO && angelEventActive) {
             angelTimer += deltaTime;
             if (angelTimer < 1.2f) {
-                int flicker = (int)(angelTimer * 20.0f);
-                flashlightOn = (flicker % 2 == 0);
+                int flicker_int = (int)(angelTimer * 20.0f);
+                flashlightOn = (flicker_int % 2 == 0);
             }
             else if (angelTimer < 2.2f) {
                 flashlightOn = false;
@@ -335,210 +782,274 @@ int main()
         }
 
         // --- LÓGICA DE RECOLECCIÓN (4 ITEMS) ---
-        if (!haveItem1 && glm::distance(camera.Position, item1Pos) < 1.5f) {
-            haveItem1 = true; itemsCollected++;
-            if (flashlightSound) Mix_PlayChannel(-1, flashlightSound, 0);
-        }
-        if (!haveItem2 && glm::distance(camera.Position, item2Pos) < 1.5f) {
-            haveItem2 = true; itemsCollected++;
-            if (flashlightSound) Mix_PlayChannel(-1, flashlightSound, 0);
-        }
-        if (!haveItem3 && glm::distance(camera.Position, item3Pos) < 1.5f) {
-            haveItem3 = true; itemsCollected++;
-            if (flashlightSound) Mix_PlayChannel(-1, flashlightSound, 0);
-        }
-        if (!haveItem4 && glm::distance(camera.Position, item4Pos) < 1.5f) {
-            haveItem4 = true; itemsCollected++;
-            if (flashlightSound) Mix_PlayChannel(-1, flashlightSound, 0);
-            if (!screamerTriggered) {
-                screamerTriggered = true; screamerTimer = 0.0f;
-                if (screamerSound) Mix_PlayChannel(-1, screamerSound, 0);
-                Mix_VolumeMusic(10);
+        if (gameState == JUGANDO) {
+            if (!haveItem1 && glm::distance(camera.Position, item1Pos) < 1.5f) {
+                haveItem1 = true; itemsCollected++;
+                if (flashlightSound) Mix_PlayChannel(-1, flashlightSound, 0);
+            }
+            if (!haveItem2 && glm::distance(camera.Position, item2Pos) < 1.5f) {
+                haveItem2 = true; itemsCollected++;
+                if (flashlightSound) Mix_PlayChannel(-1, flashlightSound, 0);
+            }
+            if (!haveItem3 && glm::distance(camera.Position, item3Pos) < 1.5f) {
+                haveItem3 = true; itemsCollected++;
+                if (flashlightSound) Mix_PlayChannel(-1, flashlightSound, 0);
+            }
+            if (!haveItem4 && glm::distance(camera.Position, item4Pos) < 1.5f) {
+                haveItem4 = true; itemsCollected++;
+                if (flashlightSound) Mix_PlayChannel(-1, flashlightSound, 0);
+                if (!screamerTriggered) {
+                    screamerTriggered = true; screamerTimer = 0.0f;
+                    if (screamerSound) Mix_PlayChannel(-1, screamerSound, 0);
+                    Mix_VolumeMusic(10);
+                }
             }
         }
 
-        if (screamerTriggered && screamerTimer < SCREAMER_DURATION) {
+        // Actualizar timer del screamer
+        if (gameState == JUGANDO && screamerTriggered && screamerTimer < SCREAMER_DURATION) {
             screamerTimer += deltaTime;
             if (screamerTimer >= SCREAMER_DURATION) Mix_VolumeMusic(ambientBaseVolume);
         }
 
-        if (isMoving && footstepSound) {
+        // SONIDO DE PASOS (SOLO si está jugando)
+        if (gameState == JUGANDO && isMoving && footstepSound)
+        {
             stepTimer += deltaTime;
             if (stepTimer >= stepInterval) { Mix_PlayChannel(-1, footstepSound, 0); stepTimer = 0.0f; }
         }
-        else { stepTimer = stepInterval; }
+        else
+        {
+            stepTimer = stepInterval;
+        }
 
-        int targetVolume = ambientBaseVolume;
-        if (isMoving) targetVolume -= 10;
-        if (!flashlightOn) targetVolume += 10;
-        ambientCurrentVolume += (targetVolume - ambientCurrentVolume) * 0.05f;
-        Mix_VolumeMusic(ambientCurrentVolume);
+        // SONIDO AMBIENTE DINÁMICO (SOLO si está jugando)
+        if (gameState == JUGANDO)
+        {
+            int targetVolume = ambientBaseVolume;
+            if (isMoving) targetVolume -= 10;
+            if (!flashlightOn) targetVolume += 10;
+            if (targetVolume < 10) targetVolume = 10;
+            if (targetVolume > 70) targetVolume = 70;
+            ambientCurrentVolume += (targetVolume - ambientCurrentVolume) * 0.05f;
+            Mix_VolumeMusic(ambientCurrentVolume);
+        }
 
         // --- RENDER ---
         glClearColor(fogColorVector.x, fogColorVector.y, fogColorVector.z, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        sceneShader.use();
-
-        // --- ENVIAR LUCES DE LÁMPARAS AL SHADER (NUEVO) ---
-        sceneShader.setInt("numPointLights", lamps.size());
-        for (int i = 0; i < lamps.size(); i++)
+        if (gameState == JUGANDO || gameState == PAUSED)
         {
-            std::string idx = "pointLights[" + std::to_string(i) + "]";
-            sceneShader.setVec3(idx + ".position", lamps[i].pos + glm::vec3(0.0f, 0.4f, 0.0f));
+            sceneShader->use();
 
-            // Luz tenue con flicker
-            sceneShader.setVec3(idx + ".ambient", glm::vec3(0.04f * flicker));
-            sceneShader.setVec3(idx + ".diffuse", glm::vec3(0.55f * flicker, 0.45f * flicker, 0.32f * flicker));
-            sceneShader.setVec3(idx + ".specular", glm::vec3(0.28f * flicker));
+            // --- ENVIAR LUCES DE LÁMPARAS AL SHADER ---
+            sceneShader->setInt("numPointLights", lamps.size());
+            for (int i = 0; i < lamps.size(); i++)
+            {
+                std::string idx = "pointLights[" + std::to_string(i) + "]";
+                sceneShader->setVec3(idx + ".position", lamps[i].pos + glm::vec3(0.0f, 0.4f, 0.0f));
 
-            sceneShader.setFloat(idx + ".constant", 1.0f);
-            sceneShader.setFloat(idx + ".linear", 0.09f);
-            sceneShader.setFloat(idx + ".quadratic", 0.032f);
-        }
+                // Luz tenue con flicker
+                sceneShader->setVec3(idx + ".ambient", glm::vec3(0.04f * flicker));
+                sceneShader->setVec3(idx + ".diffuse", glm::vec3(0.55f * flicker, 0.45f * flicker, 0.32f * flicker));
+                sceneShader->setVec3(idx + ".specular", glm::vec3(0.28f * flicker));
 
-        // Niebla
-        if (itemsCollected == 0) fogColorVector = glm::vec3(0.05f, 0.05f, 0.05f);
-        else if (itemsCollected == 1) fogColorVector = glm::vec3(0.03f, 0.03f, 0.04f);
-        else if (itemsCollected == 2) fogColorVector = glm::vec3(0.01f, 0.01f, 0.02f);
-        else if (itemsCollected >= 3) fogColorVector = glm::vec3(0.0f, 0.0f, 0.0f);
-        sceneShader.setVec3("fogColor", fogColorVector);
+                sceneShader->setFloat(idx + ".constant", 1.0f);
+                sceneShader->setFloat(idx + ".linear", 0.09f);
+                sceneShader->setFloat(idx + ".quadratic", 0.032f);
+            }
 
-        sceneShader.setVec3("viewPos", camera.Position);
-        sceneShader.setVec3("spotLight.position", camera.Position);
-        sceneShader.setVec3("spotLight.direction", camera.Front);
+            // Niebla
+            if (itemsCollected == 0) fogColorVector = glm::vec3(0.05f, 0.05f, 0.05f);
+            else if (itemsCollected == 1) fogColorVector = glm::vec3(0.03f, 0.03f, 0.04f);
+            else if (itemsCollected == 2) fogColorVector = glm::vec3(0.01f, 0.01f, 0.02f);
+            else if (itemsCollected >= 3) fogColorVector = glm::vec3(0.0f, 0.0f, 0.0f);
+            sceneShader->setVec3("fogColor", fogColorVector);
 
-        if (flashlightOn) {
-            sceneShader.setVec3("spotLight.ambient", 0.9f, 0.9f, 0.9f);
-            sceneShader.setVec3("spotLight.diffuse", 0.4f, 0.4f, 0.4f);
-            sceneShader.setVec3("spotLight.specular", 0.9f, 0.9f, 0.9f);
-        }
-        else {
-            sceneShader.setVec3("spotLight.ambient", 0.0f, 0.0f, 0.0f);
-            sceneShader.setVec3("spotLight.diffuse", 0.0f, 0.0f, 0.0f);
-            sceneShader.setVec3("spotLight.specular", 0.0f, 0.0f, 0.0f);
-        }
+            sceneShader->setVec3("viewPos", camera.Position);
+            sceneShader->setVec3("spotLight.position", camera.Position);
+            sceneShader->setVec3("spotLight.direction", camera.Front);
 
-        sceneShader.setFloat("spotLight.constant", 1.0f);
-        sceneShader.setFloat("spotLight.linear", (itemsCollected > 0) ? 0.14f : 0.022f);
-        sceneShader.setFloat("spotLight.quadratic", (itemsCollected > 0) ? 0.07f : 0.01f);
-        sceneShader.setFloat("spotLight.cutOff", glm::cos(glm::radians(12.0f)));
-        sceneShader.setFloat("spotLight.outerCutOff", glm::cos(glm::radians(17.0f)));
+            if (flashlightOn) {
+                sceneShader->setVec3("spotLight.ambient", 0.9f, 0.9f, 0.9f);
+                sceneShader->setVec3("spotLight.diffuse", 0.4f, 0.4f, 0.4f);
+                sceneShader->setVec3("spotLight.specular", 0.9f, 0.9f, 0.9f);
+            }
+            else {
+                sceneShader->setVec3("spotLight.ambient", 0.0f, 0.0f, 0.0f);
+                sceneShader->setVec3("spotLight.diffuse", 0.0f, 0.0f, 0.0f);
+                sceneShader->setVec3("spotLight.specular", 0.0f, 0.0f, 0.0f);
+            }
 
-        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-        glm::mat4 view = camera.GetViewMatrix();
-        sceneShader.setMat4("projection", projection);
-        sceneShader.setMat4("view", view);
+            sceneShader->setFloat("spotLight.constant", 1.0f);
+            sceneShader->setFloat("spotLight.linear", (itemsCollected > 0) ? 0.14f : 0.022f);
+            sceneShader->setFloat("spotLight.quadratic", (itemsCollected > 0) ? 0.07f : 0.01f);
+            sceneShader->setFloat("spotLight.cutOff", glm::cos(glm::radians(12.0f)));
+            sceneShader->setFloat("spotLight.outerCutOff", glm::cos(glm::radians(17.0f)));
 
-        // Dibujar Entorno
-        glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0.0f, GROUND_HEIGHT, 0.0f));
-        sceneShader.setMat4("model", model);
-        environment.Draw(sceneShader);
+            glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)mode->width / (float)mode->height, 0.1f, 100.0f);
+            glm::mat4 view = camera.GetViewMatrix();
+            sceneShader->setMat4("projection", projection);
+            sceneShader->setMat4("view", view);
 
-        // --- DIBUJAR LÁMPARAS ---
-        for (const Lamp& lamp : lamps)
-        {
+            // Dibujar Entorno
             glm::mat4 model = glm::mat4(1.0f);
-            model = glm::translate(model, lamp.pos + glm::vec3(0.0f, 0.75f, 0.0f));
-            model = glm::rotate(model, glm::radians(lamp.rotY), glm::vec3(0, 1, 0));
-            model = glm::translate(model, glm::vec3(0.0f, 0.0f, -0.25f)); // Offset
-            model = glm::scale(model, glm::vec3(0.4f));
-            sceneShader.setMat4("model", model);
-            lampModel.Draw(sceneShader);
-        }
+            model = glm::translate(model, glm::vec3(0.0f, GROUND_HEIGHT, 0.0f));
+            sceneShader->setMat4("model", model);
+            if (environment) environment->Draw(*sceneShader);
 
-        // --- DIBUJAR ITEMS ---
-        if (!haveItem1) {
-            model = glm::mat4(1.0f); model = glm::translate(model, item1Pos); model = glm::scale(model, glm::vec3(1.0f));
-            sceneShader.setMat4("model", model); itemModel.Draw(sceneShader);
-        }
-        if (!haveItem2) {
-            model = glm::mat4(1.0f); model = glm::translate(model, item2Pos); model = glm::scale(model, glm::vec3(1.0f));
-            sceneShader.setMat4("model", model); itemModel.Draw(sceneShader);
-        }
-        if (!haveItem3) {
-            model = glm::mat4(1.0f); model = glm::translate(model, item3Pos); model = glm::scale(model, glm::vec3(1.0f));
-            sceneShader.setMat4("model", model); itemModel.Draw(sceneShader);
-        }
-        if (!haveItem4) {
-            model = glm::mat4(1.0f); model = glm::translate(model, item4Pos); model = glm::scale(model, glm::vec3(1.0f));
-            sceneShader.setMat4("model", model); itemModel.Draw(sceneShader);
-        }
+            // --- DIBUJAR LÁMPARAS ---
+            for (const Lamp& lamp : lamps)
+            {
+                glm::mat4 model = glm::mat4(1.0f);
+                model = glm::translate(model, lamp.pos + glm::vec3(0.0f, 0.75f, 0.0f));
+                model = glm::rotate(model, glm::radians(lamp.rotY), glm::vec3(0, 1, 0));
+                model = glm::translate(model, glm::vec3(0.0f, 0.0f, -0.25f));
+                model = glm::scale(model, glm::vec3(0.4f));
+                sceneShader->setMat4("model", model);
+                if (lampModel) lampModel->Draw(*sceneShader);
+            }
 
-        // Ángel
-        if (!angelGone) {
-            if (flashlightOn || (angelEventActive && angelTimer < 1.2f)) {
+            // --- DIBUJAR ITEMS ---
+            if (!haveItem1) {
+                model = glm::mat4(1.0f); model = glm::translate(model, item1Pos); model = glm::scale(model, glm::vec3(1.0f));
+                sceneShader->setMat4("model", model); if (itemModel) itemModel->Draw(*sceneShader);
+            }
+            if (!haveItem2) {
+                model = glm::mat4(1.0f); model = glm::translate(model, item2Pos); model = glm::scale(model, glm::vec3(1.0f));
+                sceneShader->setMat4("model", model); if (itemModel) itemModel->Draw(*sceneShader);
+            }
+            if (!haveItem3) {
+                model = glm::mat4(1.0f); model = glm::translate(model, item3Pos); model = glm::scale(model, glm::vec3(1.0f));
+                sceneShader->setMat4("model", model); if (itemModel) itemModel->Draw(*sceneShader);
+            }
+            if (!haveItem4) {
+                model = glm::mat4(1.0f); model = glm::translate(model, item4Pos); model = glm::scale(model, glm::vec3(1.0f));
+                sceneShader->setMat4("model", model); if (itemModel) itemModel->Draw(*sceneShader);
+            }
+
+            // Ángel
+            if (!angelGone) {
+                if (flashlightOn || (angelEventActive && angelTimer < 1.2f)) {
+                    model = glm::mat4(1.0f);
+                    model = glm::translate(model, angelPos);
+                    model = glm::rotate(model, glm::radians(180.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+                    model = glm::scale(model, glm::vec3(3.0f));
+                    sceneShader->setMat4("model", model);
+                    if (angelModel) angelModel->Draw(*sceneShader);
+                }
+            }
+
+            // Screamer (SOLO si está jugando, no en pausa)
+            if (gameState == JUGANDO && screamerTriggered && screamerTimer < SCREAMER_DURATION && screamerModel) {
                 model = glm::mat4(1.0f);
-                model = glm::translate(model, angelPos);
-                model = glm::rotate(model, glm::radians(180.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-                model = glm::scale(model, glm::vec3(3.0f));
-                sceneShader.setMat4("model", model);
-                if (angelModel) angelModel->Draw(sceneShader);
+                glm::vec3 screamerPos = camera.Position + (camera.Front * screamerDistance);
+                glm::vec3 cameraRight = glm::normalize(glm::cross(camera.Front, camera.Up));
+                glm::vec3 cameraUp = camera.Up;
+                screamerPos += cameraRight * screamerOffset.x;
+                screamerPos += cameraUp * screamerOffset.y;
+                screamerPos += camera.Front * screamerOffset.z;
+                model = glm::translate(model, screamerPos);
+                glm::vec3 direction = glm::normalize(camera.Position - screamerPos);
+                float angle = atan2(direction.x, direction.z);
+                model = glm::rotate(model, angle, glm::vec3(0.0f, 1.0f, 0.0f));
+                model = glm::scale(model, glm::vec3(0.5f));
+                sceneShader->setMat4("model", model);
+                screamerModel->Draw(*sceneShader);
             }
-        }
 
-        // Screamer
-        if (screamerTriggered && screamerTimer < SCREAMER_DURATION && screamerModel) {
-            model = glm::mat4(1.0f);
-            glm::vec3 screamerPos = camera.Position + (camera.Front * screamerDistance);
-            glm::vec3 cameraRight = glm::normalize(glm::cross(camera.Front, camera.Up));
-            glm::vec3 cameraUp = camera.Up;
-            screamerPos += cameraRight * screamerOffset.x;
-            screamerPos += cameraUp * screamerOffset.y;
-            screamerPos += camera.Front * screamerOffset.z;
-            model = glm::translate(model, screamerPos);
-            glm::vec3 direction = glm::normalize(camera.Position - screamerPos);
-            float angle = atan2(direction.x, direction.z);
-            model = glm::rotate(model, angle, glm::vec3(0.0f, 1.0f, 0.0f));
-            model = glm::scale(model, glm::vec3(0.5f));
-            sceneShader.setMat4("model", model);
-            screamerModel->Draw(sceneShader);
-        }
-
-        // Lluvia y Skybox 
-        if (rainEnabled && rainShader) {
-            glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-            rainShader->use();
-            rainShader->setMat4("projection", projection); rainShader->setMat4("view", view);
-            rainShader->setVec3("spotLightPos", camera.Position); rainShader->setVec3("spotLightDir", camera.Front);
-            rainShader->setBool("flashlightOn", flashlightOn);
-            std::vector<float> rainVertices;
-            for (auto& drop : rainDrops) {
-                drop.position.y -= drop.speed * deltaTime;
-                if (drop.position.y < GROUND_HEIGHT) { drop.position.x = camera.Position.x + (rand() % 40) - 20.0f; drop.position.y = camera.Position.y + 15.0f + (rand() % 15); drop.position.z = camera.Position.z + (rand() % 40) - 20.0f; }
-                glm::vec3 toCam = camera.Position - drop.position; toCam.y = 0;
-                if (glm::length(toCam) > 25.0f) { drop.position = camera.Position + glm::vec3((rand() % 40) - 20, 15, (rand() % 40) - 20); }
-                rainVertices.push_back(drop.position.x); rainVertices.push_back(drop.position.y); rainVertices.push_back(drop.position.z);
-                rainVertices.push_back(drop.position.x); rainVertices.push_back(drop.position.y - 0.3f); rainVertices.push_back(drop.position.z);
+            // Lluvia
+            if (gameState == JUGANDO && rainEnabled && rainShader) {
+                glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+                rainShader->use();
+                rainShader->setMat4("projection", projection); rainShader->setMat4("view", view);
+                rainShader->setVec3("spotLightPos", camera.Position); rainShader->setVec3("spotLightDir", camera.Front);
+                rainShader->setBool("flashlightOn", flashlightOn);
+                std::vector<float> rainVertices;
+                for (auto& drop : rainDrops) {
+                    drop.position.y -= drop.speed * deltaTime;
+                    if (drop.position.y < GROUND_HEIGHT) { drop.position.x = camera.Position.x + (rand() % 40) - 20.0f; drop.position.y = camera.Position.y + 15.0f + (rand() % 15); drop.position.z = camera.Position.z + (rand() % 40) - 20.0f; }
+                    glm::vec3 toCam = camera.Position - drop.position; toCam.y = 0;
+                    if (glm::length(toCam) > 25.0f) { drop.position = camera.Position + glm::vec3((rand() % 40) - 20, 15, (rand() % 40) - 20); }
+                    rainVertices.push_back(drop.position.x); rainVertices.push_back(drop.position.y); rainVertices.push_back(drop.position.z);
+                    rainVertices.push_back(drop.position.x); rainVertices.push_back(drop.position.y - 0.3f); rainVertices.push_back(drop.position.z);
+                }
+                glBindVertexArray(rainVAO); glBindBuffer(GL_ARRAY_BUFFER, rainVBO);
+                glBufferData(GL_ARRAY_BUFFER, rainVertices.size() * sizeof(float), rainVertices.data(), GL_DYNAMIC_DRAW);
+                glEnableVertexAttribArray(0); glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+                glLineWidth(1.5f); glDrawArrays(GL_LINES, 0, rainDrops.size() * 2); glBindVertexArray(0); glDisable(GL_BLEND);
             }
-            glBindVertexArray(rainVAO); glBindBuffer(GL_ARRAY_BUFFER, rainVBO);
-            glBufferData(GL_ARRAY_BUFFER, rainVertices.size() * sizeof(float), rainVertices.data(), GL_DYNAMIC_DRAW);
-            glEnableVertexAttribArray(0); glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-            glLineWidth(1.5f); glDrawArrays(GL_LINES, 0, rainDrops.size() * 2); glBindVertexArray(0); glDisable(GL_BLEND);
+
+            // Skybox
+            glDepthFunc(GL_LEQUAL); skyboxShader->use();
+            view = glm::mat4(glm::mat3(camera.GetViewMatrix()));
+            skyboxShader->setMat4("view", view); skyboxShader->setMat4("projection", projection);
+            glBindVertexArray(skyboxVAO); glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
+            glDrawArrays(GL_TRIANGLES, 0, 36); glBindVertexArray(0); glDepthFunc(GL_LESS);
+
+            // Dibujar pantalla de pausa si está en pausa
+            ImGui_ImplOpenGL3_NewFrame();
+            ImGui_ImplGlfw_NewFrame();
+            ImGui::NewFrame();
+
+            if (gameState == PAUSED)
+            {
+                drawPauseScreen();
+            }
+
+            ImGui::Render();
+            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         }
 
-        glDepthFunc(GL_LEQUAL); skyboxShader.use();
-        view = glm::mat4(glm::mat3(camera.GetViewMatrix()));
-        skyboxShader.setMat4("view", view); skyboxShader.setMat4("projection", projection);
-        glBindVertexArray(skyboxVAO); glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
-        glDrawArrays(GL_TRIANGLES, 0, 36); glBindVertexArray(0); glDepthFunc(GL_LESS);
-
-        glfwSwapBuffers(window); glfwPollEvents();
+        glfwSwapBuffers(window);
+        glfwPollEvents();
     }
 
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
     glfwTerminate();
+
+    // Limpieza
+    if (environment) delete environment;
     if (angelModel) delete angelModel;
+    if (itemModel) delete itemModel;
+    if (lampModel) delete lampModel;
     if (screamerModel) delete screamerModel;
     if (rainShader) delete rainShader;
-    Mix_CloseAudio(); SDL_Quit();
+    if (sceneShader) delete sceneShader;
+    if (skyboxShader) delete skyboxShader;
+
+    Mix_FreeChunk(flashlightSound);
+    Mix_FreeChunk(footstepSound);
+    Mix_FreeChunk(screamerSound);
+    Mix_FreeChunk(rainSound);
+    Mix_FreeMusic(gameAmbientMusic);
+    Mix_FreeMusic(menuMusic);
+    glDeleteVertexArrays(1, &rainVAO);
+    glDeleteBuffers(1, &rainVBO);
+    glDeleteVertexArrays(1, &skyboxVAO);
+    glDeleteBuffers(1, &skyboxVBO);
+    Mix_CloseAudio();
+    SDL_Quit();
+
     return 0;
 }
 
 // Callbacks y Input
 void processInput(GLFWwindow* window)
 {
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) glfwSetWindowShouldClose(window, true);
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+    {
+        gameState = PAUSED;
+        Mix_PauseMusic();
+        if (rainSoundChannel != -1)
+        {
+            Mix_Pause(rainSoundChannel);
+        }
+    }
+
     glm::vec3 currentPos = camera.Position; glm::vec3 nextPos = currentPos;
     glm::vec3 forward = camera.Front; forward.y = 0.0f; forward = glm::normalize(forward);
     glm::vec3 right = glm::normalize(glm::cross(forward, camera.Up));
@@ -555,8 +1066,50 @@ void processInput(GLFWwindow* window)
     if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS && !rPress) { rainEnabled = !rainEnabled; rPress = true; if (rainEnabled) { if (rainSoundChannel == -1) rainSoundChannel = Mix_PlayChannel(-1, rainSound, -1); } else { Mix_HaltChannel(rainSoundChannel); rainSoundChannel = -1; } }
     if (glfwGetKey(window, GLFW_KEY_R) == GLFW_RELEASE) rPress = false;
 }
+
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) { glViewport(0, 0, width, height); }
-void mouse_callback(GLFWwindow* window, double xpos, double ypos) { if (firstMouse) { lastX = xpos; lastY = ypos; firstMouse = false; } float xoffset = xpos - lastX; float yoffset = lastY - ypos; lastX = xpos; lastY = ypos; camera.ProcessMouseMovement(xoffset, yoffset); }
-void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) { camera.ProcessMouseScroll(yoffset); }
-void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) { if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) { if (!angelEventActive) { flashlightOn = !flashlightOn; if (flashlightSound) Mix_PlayChannel(-1, flashlightSound, 0); } } }
-unsigned int loadCubemap(std::vector<std::string> faces) { unsigned int textureID; glGenTextures(1, &textureID); glBindTexture(GL_TEXTURE_CUBE_MAP, textureID); int width, height, nrChannels; for (unsigned int i = 0; i < faces.size(); i++) { unsigned char* data = stbi_load(faces[i].c_str(), &width, &height, &nrChannels, 0); if (data) { glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data); stbi_image_free(data); } else { std::cout << "Cubemap failed: " << faces[i] << std::endl; stbi_image_free(data); } } glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR); glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR); glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE); return textureID; }
+
+void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
+    if (gameState != JUGANDO) return;
+    if (firstMouse) { lastX = xpos; lastY = ypos; firstMouse = false; }
+    float xoffset = xpos - lastX; float yoffset = lastY - ypos;
+    lastX = xpos; lastY = ypos;
+    camera.ProcessMouseMovement(xoffset, yoffset);
+}
+
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
+    if (gameState == JUGANDO) camera.ProcessMouseScroll(yoffset);
+}
+
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
+    if (gameState == JUGANDO && button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+        if (!angelEventActive) {
+            flashlightOn = !flashlightOn;
+            if (flashlightSound) Mix_PlayChannel(-1, flashlightSound, 0);
+        }
+    }
+}
+
+unsigned int loadCubemap(std::vector<std::string> faces) {
+    unsigned int textureID;
+    glGenTextures(1, &textureID);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
+    int width, height, nrChannels;
+    for (unsigned int i = 0; i < faces.size(); i++) {
+        unsigned char* data = stbi_load(faces[i].c_str(), &width, &height, &nrChannels, 0);
+        if (data) {
+            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+            stbi_image_free(data);
+        }
+        else {
+            std::cout << "Cubemap failed: " << faces[i] << std::endl;
+            stbi_image_free(data);
+        }
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    return textureID;
+}
