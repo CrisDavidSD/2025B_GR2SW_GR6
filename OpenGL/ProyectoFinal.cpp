@@ -885,7 +885,7 @@ int main()
 
                 // Luz más intensa
                 sceneShader->setVec3(idx + ".ambient", glm::vec3(0.08f * flicker));
-                sceneShader->setVec3(idx + ".diffuse", glm::vec3(0.8f * flicker, 0.7f * flicker, 0.5f * flicker));
+                sceneShader->setVec3(idx + ".diffuse", glm::vec3(1.0f * flicker, 1.0f * flicker, 1.0f * flicker));
                 sceneShader->setVec3(idx + ".specular", glm::vec3(0.5f * flicker));
 
                 sceneShader->setFloat(idx + ".constant", 1.0f);
