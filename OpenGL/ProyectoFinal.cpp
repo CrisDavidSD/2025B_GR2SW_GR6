@@ -46,10 +46,16 @@ const float GROUND_HEIGHT = 0.0f;
 const float EYE_HEIGHT = -0.75f;
 
 // Estado del Jugador
-bool flashlightOn = true;
+bool flashlightOn = false; // Ahora apagada al inicio
 bool leftMousePressed = false;
 bool isMoving = false;
 int itemsCollected = 0;
+
+// Para la recolección con UI
+bool canCollectItem1 = false;
+bool canCollectItem2 = false;
+bool canCollectItem3 = false;
+bool canCollectItem4 = false;
 
 // Audio
 Mix_Chunk* flashlightSound = nullptr;
@@ -91,7 +97,7 @@ enum PropModelType {
     MODEL_SCREAMER, // Bebé
     MODEL_ITEM,     // Calavera/Farola
     MODEL_LAMP,    // Lámpara
-	MODEL_MUJER    // Mujer Terrorífica
+    MODEL_MUJER    // Mujer Terrorífica
 };
 
 struct DynamicProp {
@@ -101,7 +107,7 @@ struct DynamicProp {
     float speed;
     float lifeTime;
     glm::vec3 scale;
-    float rotationOffset; // <--- NUEVO: Rotación extra en grados (Ej: 90.0f)
+    float rotationOffset;
     PropModelType modelType;
 
     // Variables internas
@@ -111,16 +117,13 @@ struct DynamicProp {
     float timeAlive;
 };
 
-// 2. CONFIGURACIÓN DE TUS OBJETOS DINÁMICOS
-// Formato: { Posicion, Direccion, DistanciaActivacion, Velocidad, TiempoVida, Escala, TIPO_MODELO, ...internas... }
 std::vector<DynamicProp> dynamicProps = {
-    // Objeto 3: Una Calavera flotando
     {
         glm::vec3(0.930715f, -1.5f, 4.3562f),
-        glm::vec3(1.0f, 0.0f, 0.0f),  // Viene hacia ti
+        glm::vec3(1.0f, 0.0f, 0.0f),
         5.0f, 100.0f, 2.0f,
-        glm::vec3(1.0f),              // Escala pequeña
-		180.0f,                     // Rotación extra de 90 grados
+        glm::vec3(1.0f),
+        180.0f,
         MODEL_MUJER,
         glm::vec3(0), false, false, 0.0f
     }
@@ -128,7 +131,7 @@ std::vector<DynamicProp> dynamicProps = {
 
 void resetDynamicProps() {
     for (auto& prop : dynamicProps) {
-        prop.currentPos = prop.startPos; // Reiniciar posición
+        prop.currentPos = prop.startPos;
         prop.isTriggered = false;
         prop.isFinished = false;
         prop.timeAlive = 0.0f;
@@ -453,6 +456,8 @@ void drawControlsScreen()
     ImGui::SetCursorPosX(controlsStartX);
     ImGui::Text("P - Ver posicion actual");
     ImGui::SetCursorPosX(controlsStartX);
+    ImGui::Text("E - Recoger objeto");
+    ImGui::SetCursorPosX(controlsStartX);
     ImGui::Text("ESC - Pausa/Salir del juego");
     ImGui::SetWindowFontScale(1.0f);
 
@@ -512,27 +517,33 @@ void drawPauseScreen()
         Mix_ResumeMusic();
         if (rainSoundChannel != -1) Mix_Resume(rainSoundChannel);
         glfwSetInputMode(gWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        firstMouse = true;  // IMPORTANTE: Reiniciar firstMouse para evitar saltos de cámara
     }
 
     ImGui::SetCursorPosY(windowHeight * 0.65f);
     ImGui::SetCursorPosX((windowWidth - buttonWidth) * 0.5f);
     if (ImGui::Button("SALIR AL MENU", ImVec2(buttonWidth, buttonHeight)))
     {
-        gameState = MENU;
+        gameState = MENU;  // Cambiar directamente a MENU
 
         if (gameAmbientMusic) Mix_HaltMusic();
         if (rainSoundChannel != -1) { Mix_HaltChannel(rainSoundChannel); rainSoundChannel = -1; }
 
         gameTime = 0.0f;
         screamerTriggered = false;
-        flashlightOn = true;
+        flashlightOn = false;
         haveItem1 = false;
         haveItem2 = false;
         haveItem3 = false;
         haveItem4 = false;
         itemsCollected = 0;
+        canCollectItem1 = false;
+        canCollectItem2 = false;
+        canCollectItem3 = false;
+        canCollectItem4 = false;
         angelGone = false;
         angelEventActive = false;
+        camera.Position = glm::vec3(-8.0f, GROUND_HEIGHT + EYE_HEIGHT, -0.21f); // Reiniciar cámara
 
         glfwSetInputMode(gWindow, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 
@@ -541,6 +552,66 @@ void drawPauseScreen()
     ImGui::SetWindowFontScale(1.0f);
 
     ImGui::PopStyleColor(3);
+    ImGui::End();
+}
+
+void drawGameUI()
+{
+    ImGui::SetNextWindowPos(ImVec2(20, 20));
+    ImGui::SetNextWindowSize(ImVec2(400, 150), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowBgAlpha(0.0f);
+
+    ImGui::Begin("GameUI", nullptr,
+        ImGuiWindowFlags_NoTitleBar |
+        ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_AlwaysAutoResize |
+        ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoBackground); // NUEVO: Sin fondo
+
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+    ImGui::SetWindowFontScale(2.0f);
+
+    ImGui::Text("Cassettes recogidos: %d/4", itemsCollected);
+
+    if (itemsCollected == 4) {
+        ImGui::TextColored(ImVec4(1.0f, 0.84f, 0.0f, 1.0f), "Busca el reproductor de cassettes");
+    }
+
+    ImGui::SetWindowFontScale(1.0f);
+    ImGui::PopStyleColor();
+    ImGui::End();
+}
+
+void drawCollectUI()
+{
+    // Mostrar "E" en el centro si está cerca de un objeto
+    float centerX = ImGui::GetIO().DisplaySize.x * 0.5f;
+    float centerY = ImGui::GetIO().DisplaySize.y * 0.5f;
+
+    ImGui::SetNextWindowPos(ImVec2(centerX - 20, centerY - 20));
+    ImGui::SetNextWindowSize(ImVec2(40, 40), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowBgAlpha(0.0f);
+
+    ImGui::Begin("CollectUI", nullptr,
+        ImGuiWindowFlags_NoTitleBar |
+        ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_AlwaysAutoResize |
+        ImGuiWindowFlags_NoBackground); // NUEVO: Sin fondo
+
+    bool showE = (canCollectItem1 && !haveItem1) ||
+        (canCollectItem2 && !haveItem2) ||
+        (canCollectItem3 && !haveItem3) ||
+        (canCollectItem4 && !haveItem4);
+
+    if (showE) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 1.0f, 0.0f, 1.0f));
+        ImGui::SetWindowFontScale(3.0f);
+        ImGui::Text("E");
+        ImGui::SetWindowFontScale(1.0f);
+        ImGui::PopStyleColor();
+    }
+
     ImGui::End();
 }
 
@@ -606,7 +677,7 @@ void loadResources()
     skyboxShader->setInt("skybox", 0);
 
     loadingProgress = 1.0f;
-    resetDynamicProps(); // Inicializar posiciones de props
+    resetDynamicProps();
 }
 
 int main()
@@ -688,7 +759,7 @@ int main()
         glfwSwapBuffers(window);
     }
 
-    while (!glfwWindowShouldClose(window))
+    while (!glfwWindowShouldClose(window) && (gameState == JUGANDO || gameState == PAUSED))
     {
         float currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
@@ -697,22 +768,18 @@ int main()
         if (gameState == JUGANDO) processInput(window);
         if (gameState == JUGANDO) gameTime += deltaTime;
 
-        float flicker = 0.6f + 0.4f * sin(glfwGetTime() * 5.0f) + 0.2f * sin(glfwGetTime() * 14.0f);
+        float flicker = 1.0f; // CONSTANTE: Sin parpadeo, luz siempre prendida
 
-        // --- ACTUALIZAR PROPS MÓVILES (NUEVO) ---
+        // --- ACTUALIZAR PROPS MÓVILES ---
         if (gameState == JUGANDO) {
             for (auto& prop : dynamicProps) {
                 if (prop.isFinished) continue;
-
                 if (!prop.isTriggered) {
-                    // Checar distancia
                     if (glm::distance(camera.Position, prop.startPos) < prop.triggerDist) {
                         prop.isTriggered = true;
-                        // Opcional: Sonido al activarse
                     }
                 }
                 else {
-                    // Moverse
                     prop.timeAlive += deltaTime;
                     prop.currentPos += prop.moveDir * prop.speed * deltaTime;
                     if (prop.timeAlive >= prop.lifeTime) {
@@ -734,14 +801,42 @@ int main()
             else { flashlightOn = true; angelGone = true; angelEventActive = false; }
         }
 
-        // --- LÓGICA ITEMS ---
+        // --- LÓGICA RECOLECCIÓN CON UI ---
         if (gameState == JUGANDO) {
-            if (!haveItem1 && glm::distance(camera.Position, item1Pos) < 1.5f) { haveItem1 = true; itemsCollected++; if (flashlightSound) Mix_PlayChannel(-1, flashlightSound, 0); }
-            if (!haveItem2 && glm::distance(camera.Position, item2Pos) < 1.5f) { haveItem2 = true; itemsCollected++; if (flashlightSound) Mix_PlayChannel(-1, flashlightSound, 0); }
-            if (!haveItem3 && glm::distance(camera.Position, item3Pos) < 1.5f) { haveItem3 = true; itemsCollected++; if (flashlightSound) Mix_PlayChannel(-1, flashlightSound, 0); }
-            if (!haveItem4 && glm::distance(camera.Position, item4Pos) < 1.5f) {
-                haveItem4 = true; itemsCollected++; if (flashlightSound) Mix_PlayChannel(-1, flashlightSound, 0);
-                if (!screamerTriggered) { screamerTriggered = true; screamerTimer = 0.0f; if (screamerSound) Mix_PlayChannel(-1, screamerSound, 0); Mix_VolumeMusic(10); }
+            // Detectar cercanía a items
+            canCollectItem1 = !haveItem1 && glm::distance(camera.Position, item1Pos) < 2.0f;
+            canCollectItem2 = !haveItem2 && glm::distance(camera.Position, item2Pos) < 2.0f;
+            canCollectItem3 = !haveItem3 && glm::distance(camera.Position, item3Pos) < 2.0f;
+            canCollectItem4 = !haveItem4 && glm::distance(camera.Position, item4Pos) < 2.0f;
+
+            // Recoger con E
+            if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) {
+                if (canCollectItem1) {
+                    haveItem1 = true;
+                    itemsCollected++;
+                    if (flashlightSound) Mix_PlayChannel(-1, flashlightSound, 0);
+                }
+                if (canCollectItem2) {
+                    haveItem2 = true;
+                    itemsCollected++;
+                    if (flashlightSound) Mix_PlayChannel(-1, flashlightSound, 0);
+                }
+                if (canCollectItem3) {
+                    haveItem3 = true;
+                    itemsCollected++;
+                    if (flashlightSound) Mix_PlayChannel(-1, flashlightSound, 0);
+                }
+                if (canCollectItem4) {
+                    haveItem4 = true;
+                    itemsCollected++;
+                    if (flashlightSound) Mix_PlayChannel(-1, flashlightSound, 0);
+                    if (!screamerTriggered) {
+                        screamerTriggered = true;
+                        screamerTimer = 0.0f;
+                        if (screamerSound) Mix_PlayChannel(-1, screamerSound, 0);
+                        Mix_VolumeMusic(10);
+                    }
+                }
             }
         }
 
@@ -750,7 +845,7 @@ int main()
             screamerTimer += deltaTime; if (screamerTimer >= SCREAMER_DURATION) Mix_VolumeMusic(ambientBaseVolume);
         }
 
-        // SONIDO DE PASOS (SOLO si está jugando)
+        // SONIDO DE PASOS
         if (gameState == JUGANDO && isMoving && footstepSound)
         {
             stepTimer += deltaTime;
@@ -761,7 +856,7 @@ int main()
             stepTimer = stepInterval;
         }
 
-        // SONIDO AMBIENTE DINÁMICO (SOLO si está jugando)
+        // SONIDO AMBIENTE DINÁMICO
         if (gameState == JUGANDO)
         {
             int targetVolume = ambientBaseVolume;
@@ -781,21 +876,21 @@ int main()
         {
             sceneShader->use();
 
-            // --- ENVIAR LUCES DE LÁMPARAS AL SHADER ---
+            // --- LUCES DE LÁMPARAS - MÁS INTENSAS CON MENOR RANGO ---
             sceneShader->setInt("numPointLights", lamps.size());
             for (int i = 0; i < lamps.size(); i++)
             {
                 std::string idx = "pointLights[" + std::to_string(i) + "]";
                 sceneShader->setVec3(idx + ".position", lamps[i].pos + glm::vec3(0.0f, 0.4f, 0.0f));
 
-                // Luz tenue con flicker
-                sceneShader->setVec3(idx + ".ambient", glm::vec3(0.04f * flicker));
-                sceneShader->setVec3(idx + ".diffuse", glm::vec3(0.55f * flicker, 0.45f * flicker, 0.32f * flicker));
-                sceneShader->setVec3(idx + ".specular", glm::vec3(0.28f * flicker));
+                // Luz más intensa
+                sceneShader->setVec3(idx + ".ambient", glm::vec3(0.08f * flicker));
+                sceneShader->setVec3(idx + ".diffuse", glm::vec3(0.8f * flicker, 0.7f * flicker, 0.5f * flicker));
+                sceneShader->setVec3(idx + ".specular", glm::vec3(0.5f * flicker));
 
                 sceneShader->setFloat(idx + ".constant", 1.0f);
-                sceneShader->setFloat(idx + ".linear", 0.09f);
-                sceneShader->setFloat(idx + ".quadratic", 0.032f);
+                sceneShader->setFloat(idx + ".linear", 0.22f);  // Rango más corto
+                sceneShader->setFloat(idx + ".quadratic", 0.08f); // Más rápido falloff
             }
 
             // Niebla
@@ -849,16 +944,14 @@ int main()
                 if (lampModel) lampModel->Draw(*sceneShader);
             }
 
-            // --- VARIABLES DE ANIMACIÓN (NUEVO) ---
-            float hoverOffset = sin(gameTime * 2.0f) * 0.1f; // Sube y baja 10cm
-            float rotationAngle = gameTime * 45.0f; // Gira 45 grados por segundo
+            // --- VARIABLES DE ANIMACIÓN ---
+            float hoverOffset = sin(gameTime * 2.0f) * 0.1f;
+            float rotationAngle = gameTime * 45.0f;
 
             // --- DIBUJAR ITEMS ---
             if (!haveItem1) {
                 model = glm::mat4(1.0f);
-                // Posición base + Altura extra (0.5f) + Movimiento suave (hoverOffset)
                 model = glm::translate(model, item1Pos + glm::vec3(0.0f, 0.5f + hoverOffset, 0.0f));
-                // Rotación constante
                 model = glm::rotate(model, glm::radians(rotationAngle), glm::vec3(0.0f, 1.0f, 0.0f));
                 model = glm::scale(model, glm::vec3(0.1f));
                 sceneShader->setMat4("model", model);
@@ -901,21 +994,16 @@ int main()
                 }
             }
 
-            // --- RENDERIZAR PROPS MÓVILES (CORREGIDO PARA VISIBILIDAD) ---
+            // --- RENDERIZAR PROPS MÓVILES ---
             for (const auto& prop : dynamicProps) {
-                // Dibujamos siempre que no haya terminado
                 if (!prop.isFinished) {
                     model = glm::mat4(1.0f);
                     model = glm::translate(model, prop.currentPos);
-
                     float angle = atan2(prop.moveDir.x, prop.moveDir.z);
                     model = glm::rotate(model, angle + glm::radians(prop.rotationOffset), glm::vec3(0, 1, 0));
-
                     model = glm::scale(model, prop.scale);
-
                     sceneShader->setMat4("model", model);
 
-                    // ELEGIR MODELO SEGÚN EL TIPO
                     switch (prop.modelType) {
                     case MODEL_ANGEL:
                         if (angelModel) angelModel->Draw(*sceneShader);
@@ -936,7 +1024,7 @@ int main()
                 }
             }
 
-            // Screamer (SOLO si está jugando, no en pausa)
+            // Screamer
             if (gameState == JUGANDO && screamerTriggered && screamerTimer < SCREAMER_DURATION && screamerModel) {
                 model = glm::mat4(1.0f);
                 glm::vec3 screamerPos = camera.Position + (camera.Front * screamerDistance);
@@ -983,10 +1071,15 @@ int main()
             glBindVertexArray(skyboxVAO); glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
             glDrawArrays(GL_TRIANGLES, 0, 36); glBindVertexArray(0); glDepthFunc(GL_LESS);
 
-            // Dibujar pantalla de pausa si está en pausa
+            // UI durante el juego
             ImGui_ImplOpenGL3_NewFrame();
             ImGui_ImplGlfw_NewFrame();
             ImGui::NewFrame();
+
+            if (gameState == JUGANDO) {
+                drawGameUI();
+                drawCollectUI();
+            }
 
             if (gameState == PAUSED)
             {
@@ -1055,13 +1148,13 @@ void processInput(GLFWwindow* window)
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) nextPos -= right * velocity;
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) nextPos += right * velocity;
     nextPos.y = GROUND_HEIGHT + EYE_HEIGHT;
-    //if (isWalkable(nextPos)) { 
-    camera.Position = nextPos;
-    isMoving = glm::distance(nextPos, currentPos) > 0.0001f;
-    /*}
+    if (isWalkable(nextPos)) {
+        camera.Position = nextPos;
+        isMoving = glm::distance(nextPos, currentPos) > 0.0001f;
+    }
     else {
         isMoving = false;
-    }*/
+    }
     if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS) std::cout << "Pos: " << nextPos.x << ", " << nextPos.y << ", " << nextPos.z << std::endl;
     static bool rPress = false;
     if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS && !rPress) { rainEnabled = !rainEnabled; rPress = true; if (rainEnabled) { if (rainSoundChannel == -1) rainSoundChannel = Mix_PlayChannel(-1, rainSound, -1); } else { Mix_HaltChannel(rainSoundChannel); rainSoundChannel = -1; } }
