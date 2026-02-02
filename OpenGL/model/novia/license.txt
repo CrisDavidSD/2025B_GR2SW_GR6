@@ -1,0 +1,11 @@
+Model Information:
+* title:	horror woman
+* source:	https://sketchfab.com/3d-models/horror-woman-a23261cfc13d4ca7a4218ceeb4d716ef
+* author:	sarpefe (https://sketchfab.com/sarpefe)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "horror woman" (https://sketchfab.com/3d-models/horror-woman-a23261cfc13d4ca7a4218ceeb4d716ef) by sarpefe (https://sketchfab.com/sarpefe) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
