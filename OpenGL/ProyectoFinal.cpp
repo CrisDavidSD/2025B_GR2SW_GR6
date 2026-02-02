@@ -87,6 +87,12 @@ bool angelEventActive = false;
 bool angelGone = false;
 float angelTimer = 0.0f;
 
+//Screamer 
+Model* currentScreamerModel = nullptr;
+glm::vec3 activeScreamerScale = glm::vec3(1.0f);
+float activeScreamerRotation = 0.0f;
+float activeScreamerYOffset = -0.5f;
+
 // ---------------------------------------------------------
 // --- SISTEMA DE OBJETOS CON MOVIMIENTO (DynamicProp) ---
 // ---------------------------------------------------------
@@ -126,6 +132,16 @@ std::vector<DynamicProp> dynamicProps = {
         180.0f,
         MODEL_MUJER,
         glm::vec3(0), false, false, 0.0f
+    },
+
+    {
+        glm::vec3(0.930715f, -1.5f, 4.3562f),
+        glm::vec3(1.0f, 0.0f, 0.0f),
+        5.0f, 100.0f, 2.0f,
+        glm::vec3(1.0f),
+        180.0f,
+        MODEL_MUJER,
+        glm::vec3(0), false, false, 0.0f
     }
 };
 
@@ -137,6 +153,21 @@ void resetDynamicProps() {
         prop.timeAlive = 0.0f;
     }
 }
+
+struct ProximityScreamer {
+    glm::vec3 position;
+    float triggerDist;
+    PropModelType modelType;
+    glm::vec3 scale;
+    float rotationOffset;
+    float yOffset;    
+    bool isTriggered;
+};
+
+std::vector<ProximityScreamer> proximityScreamers = {
+    // {Posicion}, Distancia, Modelo, {Escala}, Rotación, yOffset, Estado
+    {{-8.0692f, -1.5f, 4.25496f}, 2.5f, MODEL_MUJER, glm::vec3(1.0f), 0.0f, -0.75f, false}
+};
 
 // --- SISTEMA DE LÁMPARAS ---
 struct Lamp {
@@ -624,12 +655,13 @@ void loadResources()
     angelModel = new Model("model/angelMuerte/angelMuerte.obj");
 
     loadingProgress = 0.5f;
-    itemModel = new Model("model/calavera/calavera.obj");
+    itemModel = new Model("model/cassette/cinta.obj");
     lampModel = new Model("model/lampara1/lampara1.obj");
     mujerModel = new Model("model/mujerTerror/mujerTerror.obj");
 
     loadingProgress = 0.65f;
     screamerModel = new Model("model/bebeTerror/bebeTerror.obj");
+    currentScreamerModel = screamerModel;
 
     loadingProgress = 0.75f;
     srand(time(NULL));
@@ -830,19 +862,47 @@ int main()
                     haveItem4 = true;
                     itemsCollected++;
                     if (flashlightSound) Mix_PlayChannel(-1, flashlightSound, 0);
-                    if (!screamerTriggered) {
-                        screamerTriggered = true;
+                }
+            }
+        }
+
+        if (gameState == JUGANDO && !screamerTriggered) {
+            for (auto& s : proximityScreamers) {
+                if (!s.isTriggered) {
+                    float dist = glm::distance(camera.Position, s.position);
+                    if (dist < s.triggerDist) {
+                        s.isTriggered = true; // El modelo desaparece del mapa
+                        screamerTriggered = true; // Comienza el susto en pantalla
                         screamerTimer = 0.0f;
+                        activeScreamerScale = s.scale;
+                        activeScreamerRotation = s.rotationOffset;
+                        activeScreamerYOffset = s.yOffset;
+
+                        // Asignamos el modelo dinámicamente para el susto
+                        if (s.modelType == MODEL_MUJER) currentScreamerModel = mujerModel;
+                        else if (s.modelType == MODEL_SCREAMER) currentScreamerModel = screamerModel;
+
                         if (screamerSound) Mix_PlayChannel(-1, screamerSound, 0);
                         Mix_VolumeMusic(10);
+                        break;
                     }
                 }
             }
         }
 
+
+
         // Actualizar timer del screamer
         if (gameState == JUGANDO && screamerTriggered && screamerTimer < SCREAMER_DURATION) {
-            screamerTimer += deltaTime; if (screamerTimer >= SCREAMER_DURATION) Mix_VolumeMusic(ambientBaseVolume);
+            screamerTimer += deltaTime;
+            // Efecto de parpadeo (flicker)
+            int flicker_int = (int)(screamerTimer * 20.0f);
+            flashlightOn = (flicker_int % 2 == 0);
+
+            if (screamerTimer >= SCREAMER_DURATION) {
+                flashlightOn = true; // Asegurar que quede encendida al terminar
+                Mix_VolumeMusic(ambientBaseVolume);
+            }
         }
 
         // SONIDO DE PASOS
@@ -1024,22 +1084,59 @@ int main()
                 }
             }
 
-            // Screamer
-            if (gameState == JUGANDO && screamerTriggered && screamerTimer < SCREAMER_DURATION && screamerModel) {
-                model = glm::mat4(1.0f);
-                glm::vec3 screamerPos = camera.Position + (camera.Front * screamerDistance);
+            for (const auto& s : proximityScreamers) {
+                if (!s.isTriggered) { // Solo se dibujan si NO han sido activados
+                    glm::mat4 modelStatic = glm::mat4(1.0f);
+                    modelStatic = glm::translate(modelStatic, s.position);
+                    modelStatic = glm::rotate(modelStatic, glm::radians(s.rotationOffset), glm::vec3(0, 1, 0));
+                    modelStatic = glm::scale(modelStatic, s.scale);
+
+                    sceneShader->setMat4("model", modelStatic);
+
+                    switch (s.modelType) {
+                    case MODEL_ANGEL:
+                        if (angelModel) angelModel->Draw(*sceneShader);
+                        break;
+                    case MODEL_SCREAMER:
+                        if (screamerModel) screamerModel->Draw(*sceneShader);
+                        break;
+                    case MODEL_ITEM:
+                        if (itemModel) itemModel->Draw(*sceneShader);
+                        break;
+                    case MODEL_LAMP:
+                        if (lampModel) lampModel->Draw(*sceneShader);
+                        break;
+                    case MODEL_MUJER:
+                        if (mujerModel) mujerModel->Draw(*sceneShader);
+                        break;
+                    }
+                }
+            }
+
+
+            // Screamer (SOLO si está jugando, no en pausa)
+            if (gameState == JUGANDO && screamerTriggered && screamerTimer < SCREAMER_DURATION && currentScreamerModel) {
+                glm::mat4 modelScreamer = glm::mat4(1.0f);
+
+                // Empujamos el modelo 0.2f extra hacia adelante para que no atraviese la cámara
+                glm::vec3 sPos = camera.Position + (camera.Front * (screamerDistance + 0.2f));
                 glm::vec3 cameraRight = glm::normalize(glm::cross(camera.Front, camera.Up));
-                glm::vec3 cameraUp = camera.Up;
-                screamerPos += cameraRight * screamerOffset.x;
-                screamerPos += cameraUp * screamerOffset.y;
-                screamerPos += camera.Front * screamerOffset.z;
-                model = glm::translate(model, screamerPos);
-                glm::vec3 direction = glm::normalize(camera.Position - screamerPos);
+
+                sPos += cameraRight * screamerOffset.x;
+                sPos += camera.Up * activeScreamerYOffset;
+
+                modelScreamer = glm::translate(modelScreamer, sPos);
+
+                // 2. Rotación: Que mire a la cámara
+                glm::vec3 direction = glm::normalize(camera.Position - sPos);
                 float angle = atan2(direction.x, direction.z);
-                model = glm::rotate(model, angle, glm::vec3(0.0f, 1.0f, 0.0f));
-                model = glm::scale(model, glm::vec3(0.5f));
-                sceneShader->setMat4("model", model);
-                screamerModel->Draw(*sceneShader);
+                modelScreamer = glm::rotate(modelScreamer, angle + glm::radians(activeScreamerRotation), glm::vec3(0.0f, 1.0f, 0.0f));
+
+                // 3. Escala
+                modelScreamer = glm::scale(modelScreamer, activeScreamerScale);
+
+                sceneShader->setMat4("model", modelScreamer);
+                currentScreamerModel->Draw(*sceneShader);
             }
 
             // Lluvia
