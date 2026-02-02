@@ -1,0 +1,11 @@
+Model Information:
+* title:	Monster Girl
+* source:	https://sketchfab.com/3d-models/monster-girl-414de51ea775487294cf2fda4ead8d87
+* author:	ngooiwong (https://sketchfab.com/ngooi1397)
+
+Model License:
+* license type:	CC-BY-SA-4.0 (http://creativecommons.org/licenses/by-sa/4.0/)
+* requirements:	Author must be credited. Modified versions must have the same license. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Monster Girl" (https://sketchfab.com/3d-models/monster-girl-414de51ea775487294cf2fda4ead8d87) by ngooiwong (https://sketchfab.com/ngooi1397) licensed under CC-BY-SA-4.0 (http://creativecommons.org/licenses/by-sa/4.0/)
